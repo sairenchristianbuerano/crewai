@@ -1,0 +1,381 @@
+# CrewAI Backend Services .gitignore
+# Based on Flowise reference implementation
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+*.env
+
+# API Keys and Secrets
+secrets/
+*.key
+*.pem
+*.cert
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ============================================
+# Virtual Environments
+# ============================================
+venv/
+ENV/
+env/
+.venv
+env.bak/
+venv.bak/
+pythonenv*
+
+# ============================================
+# IDE & Editors
+# ============================================
+# VSCode
+.vscode/
+.vscode-test/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# ============================================
+# Operating System
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ============================================
+# Docker
+# ============================================
+# Don't ignore Dockerfiles
+!Dockerfile
+!docker-compose.yml
+!.dockerignore
+
+# Docker volumes (if mounted locally)
+docker-volumes/
+
+# ============================================
+# Component Data & Generated Files
+# ============================================
+# Component Index Data (Generated at runtime)
+component-index/data/components/
+component-index/data/chromadb/
+!component-index/data/components/.gitkeep
+!component-index/data/chromadb/.gitkeep
+
+# Component Generator Data
+component-generator/data/
+!component-generator/data/.gitkeep
+
+# Generated Tools (Test outputs)
+component-generator/generated/
+component-generator/test-outputs/
+!component-generator/test-outputs/README.md
+
+# Reference Tools (Keep the reference tools for RAG)
+# component-index/data/crewai_components/  # KEEP THESE!
+
+# ============================================
+# Service-Specific
+# ============================================
+# Standalone mode PID files
+.component-index.pid
+.component-generator.pid
+
+# Service locks
+*.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# ============================================
+# Backup Files
+# ============================================
+*.bak
+*.backup
+*.old
+backup_*.json
+*_backup.json
+
+# ============================================
+# Database Files
+# ============================================
+# SQLite databases (ChromaDB persistence - generated at runtime)
+*.sqlite
+*.sqlite3
+*.db
+
+# Database backups
+*.sql.gz
+*.dump
+
+# ============================================
+# Testing
+# ============================================
+.pytest_cache/
+.tox/
+test-results/
+test-reports/
+*.cover
+.coverage
+htmlcov/
+
+# Test outputs
+*_test_output.json
+test_generation_*.py
+test_tool_*.py
+
+# ============================================
+# AI/ML Models & Cache
+# ============================================
+# Model cache (sentence-transformers, etc.)
+.cache/
+models/
+*.onnx
+*.bin
+*.pt
+*.pth
+
+# ChromaDB ONNX models cache (downloaded at runtime)
+# .chroma/  # Usually in user directory
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# Package Managers
+# ============================================
+# npm (if using any JS tools)
+node_modules/
+package-lock.json
+
+# Poetry
+poetry.lock
+
+# ============================================
+# Monitoring & Profiling
+# ============================================
+*.prof
+*.lprof
+.profiling/
+
+# ============================================
+# Security Scanning
+# ============================================
+.snyk
+.whitesource
+trivy-results.json
+
+# ============================================
+# CI/CD
+# ============================================
+.github/workflows/**/secrets/
+
+# ============================================
+# Custom Patterns
+# ============================================
+# Generated component files (examples)
+*_GENERATED.py
+*_FIXED.py
+generated_tool_*.py
+sample_generation_output.json
+
+# YAML specs used for testing
+test_spec_*.yaml
+!component-generator/sample_spec.yaml  # Keep the example
+
+# Component metadata dumps
+component_dump_*.json
+tools_export_*.json
+
+# ============================================
+# Keep Important Files
+# ============================================
+# Explicitly keep these
+!.gitkeep
+!README.md
+!LICENSE
+!requirements.txt
+!Dockerfile
+!docker-compose.yml
+!.env.example
+!sample_spec.yaml
+
+# Keep reference tool implementations (for RAG)
+!component-index/data/crewai_components/tools/*.py
+!component-index/data/crewai_components/tools/README.md
+
+# Keep documentation
+!docs/**/*.md
+!*.md
+
+# Keep templates
+!component-generator/templates/**/*
+
+# ============================================
+# Project Specific
+# ============================================
+# Add your custom patterns below:
+
