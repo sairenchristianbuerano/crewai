@@ -87,6 +87,17 @@ class CrewAIToolGenerator(BaseCodeGenerator):
 
             if validation_result.is_valid:
                 self.logger.info("Tool generated successfully", tool_name=spec.name)
+
+                # Log the generated code to console (like Flowise)
+                self.logger.info("=" * 80)
+                self.logger.info(f"Generated {spec.name}.py:")
+                self.logger.info("=" * 80)
+                print(generated_code)  # Print to stdout for docker logs
+                print("=" * 80)
+
+                # Save generated code to local file for testing
+                self._save_generated_tool_to_file(spec.name, generated_code)
+
                 break
 
             self.logger.warning(
@@ -444,3 +455,38 @@ print(result)
             doc += f"- {req}\n"
 
         return doc
+
+    def _save_generated_tool_to_file(self, tool_name: str, code: str):
+        """
+        Save generated tool code to local file for testing and reference
+
+        Args:
+            tool_name: Name of the tool
+            code: Generated Python code
+        """
+        try:
+            # Create generated_tools directory if it doesn't exist
+            output_dir = os.path.join("/app/data", "generated_tools")
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Generate filename
+            filename = f"{tool_name}.py"
+            filepath = os.path.join(output_dir, filename)
+
+            # Write code to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(code)
+
+            self.logger.info(
+                "Generated tool saved to file",
+                tool_name=tool_name,
+                filepath=filepath,
+                file_size=len(code)
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to save generated tool to file",
+                tool_name=tool_name,
+                error=str(e)
+            )

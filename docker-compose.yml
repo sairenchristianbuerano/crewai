@@ -19,6 +19,8 @@ services:
       - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
     volumes:
       - generator_data:/app/data
+      # Mount generated_tools to local filesystem for testing and reference
+      - ./component-generator/generated_tools:/app/data/generated_tools
     networks:
       - crewai_network
     depends_on:
