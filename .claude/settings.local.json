@@ -18,7 +18,9 @@
       "Bash(docker exec:*)",
       "Bash(python:*)",
       "Bash(docker cp:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(git -C . status --short)",
+      "Bash(ls:*)"
     ]
   }
 }
