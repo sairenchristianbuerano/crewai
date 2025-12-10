@@ -1,22 +1,22 @@
 # CrewAI Tool Generator Requirements
 
 # Web Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+fastapi>=0.115.0  # Security: Patched CVE-2024-24762 (ReDoS)
+uvicorn[standard]>=0.30.0
+pydantic>=2.10.0
 
 # AI & Code Generation
-anthropic==0.39.0
-jinja2==3.1.2
+anthropic>=0.40.0
+jinja2>=3.1.5  # Security: Patched CVE-2024-22195, CVE-2024-34064, CVE-2024-56201, CVE-2024-56326
 
 # HTTP Client
-httpx==0.25.1
+httpx>=0.27.0
 
 # Logging
-structlog==23.2.0
+structlog>=24.4.0
 
 # YAML Processing
-pyyaml==6.0.1
+pyyaml>=6.0.3  # Security: Latest stable release
 
 # Optional dependencies for enhanced features
-python-multipart==0.0.6
+python-multipart>=0.0.18  # Security: Patched CVE-2024-24762, CVE-2024-53981

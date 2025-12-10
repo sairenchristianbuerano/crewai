@@ -8,6 +8,7 @@ Endpoint prefix: /api/crewai/*
 import os
 import yaml
 from typing import Optional
+from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,11 +20,39 @@ from base_classes import ToolSpec, GeneratedTool
 
 logger = structlog.get_logger()
 
+# Generator instances
+generator: Optional[CrewAIToolGenerator] = None
+feasibility_checker: Optional[CrewAIFeasibilityChecker] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown"""
+    # Startup
+    global generator, feasibility_checker
+
+    logger.info("Starting CrewAI Tool Generator service")
+
+    # Initialize generator
+    rag_service_url = os.getenv("RAG_SERVICE_URL", "http://localhost:8086")
+
+    generator = CrewAIToolGenerator(rag_service_url=rag_service_url)
+    feasibility_checker = CrewAIFeasibilityChecker()
+
+    logger.info("CrewAI Tool Generator and Feasibility Checker initialized")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down CrewAI Tool Generator")
+
+
 # FastAPI app
 app = FastAPI(
     title="CrewAI Tool Generator",
     version="0.1.0",
-    description="Generate custom crewAI tool components from YAML specifications"
+    description="Generate custom crewAI tool components from YAML specifications",
+    lifespan=lifespan
 )
 
 # CORS Configuration
@@ -40,36 +69,10 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Generator instances
-generator: Optional[CrewAIToolGenerator] = None
-feasibility_checker: Optional[CrewAIFeasibilityChecker] = None
-
 
 class GenerateRequest(BaseModel):
     """Request model for tool generation"""
     spec: str
-
-
-@app.on_event("startup")
-async def startup():
-    """Initialize generator"""
-    global generator, feasibility_checker
-
-    logger.info("Starting CrewAI Tool Generator service")
-
-    # Initialize generator
-    rag_service_url = os.getenv("RAG_SERVICE_URL", "http://localhost:8086")
-
-    generator = CrewAIToolGenerator(rag_service_url=rag_service_url)
-    feasibility_checker = CrewAIFeasibilityChecker()
-
-    logger.info("CrewAI Tool Generator and Feasibility Checker initialized")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Cleanup"""
-    logger.info("Shutting down CrewAI Tool Generator")
 
 
 @app.get("/api/crewai/tool-generator/health")

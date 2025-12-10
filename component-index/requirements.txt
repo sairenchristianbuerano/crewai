@@ -1,9 +1,9 @@
 # CrewAI Tool Index Requirements
 
 # Web Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+fastapi>=0.115.0  # Security: Patched CVE-2024-24762 (ReDoS)
+uvicorn[standard]>=0.30.0
+pydantic>=2.10.0
 
 # Vector Database & Embeddings
 chromadb>=0.4.22
@@ -11,7 +11,7 @@ sentence-transformers>=2.3.1
 numpy<2.0.0  # Fix compatibility: sentence-transformers requires NumPy 1.x
 
 # Logging
-structlog==23.2.0
+structlog>=24.4.0
 
 # Optional dependencies
-python-multipart==0.0.6
+python-multipart>=0.0.18  # Security: Patched CVE-2024-24762, CVE-2024-53981

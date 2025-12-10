@@ -8,6 +8,7 @@ Endpoint prefix: /api/crewai/*
 import os
 import uuid
 from typing import Optional, List
+from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,27 +20,6 @@ from crewai_rag_engine import CrewAIRAGEngine
 
 logger = structlog.get_logger()
 
-# FastAPI app
-app = FastAPI(
-    title="CrewAI Tool Index",
-    version="0.1.0",
-    description="Tool registry and tracking for crewAI tools"
-)
-
-# CORS Configuration
-cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8085", "http://localhost:3000"]')
-# Parse JSON string to list
-import json
-allowed_origins = json.loads(cors_origins) if isinstance(cors_origins, str) else cors_origins
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
 # Storage instance
 storage: Optional[ToolStorage] = None
 
@@ -47,9 +27,10 @@ storage: Optional[ToolStorage] = None
 pattern_engine: Optional[CrewAIRAGEngine] = None
 
 
-@app.on_event("startup")
-async def startup():
-    """Initialize storage and RAG pattern engine"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown"""
+    # Startup
     global storage, pattern_engine
 
     logger.info("Starting CrewAI Tool Index service")
@@ -76,11 +57,33 @@ async def startup():
         logger.warning("Pattern engine initialization failed", error=str(e))
         logger.warning("Pattern search endpoints will not be available")
 
+    yield
 
-@app.on_event("shutdown")
-async def shutdown():
-    """Cleanup"""
+    # Shutdown
     logger.info("Shutting down CrewAI Tool Index")
+
+
+# FastAPI app
+app = FastAPI(
+    title="CrewAI Tool Index",
+    version="0.1.0",
+    description="Tool registry and tracking for crewAI tools",
+    lifespan=lifespan
+)
+
+# CORS Configuration
+cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8085", "http://localhost:3000"]')
+# Parse JSON string to list
+import json
+allowed_origins = json.loads(cors_origins) if isinstance(cors_origins, str) else cors_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 
 @app.get("/api/crewai/tool-index/health")
