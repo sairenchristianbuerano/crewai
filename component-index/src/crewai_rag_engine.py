@@ -37,10 +37,14 @@ class CrewAIRAGEngine:
             import chromadb
             from chromadb.config import Settings
 
-            self.client = chromadb.Client(Settings(
-                persist_directory=str(self.persist_dir),
-                anonymized_telemetry=False
-            ))
+            # Use PersistentClient for proper disk persistence
+            self.client = chromadb.PersistentClient(
+                path=str(self.persist_dir),
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True
+                )
+            )
 
             # Get or create collection
             self.collection = self.client.get_or_create_collection(
