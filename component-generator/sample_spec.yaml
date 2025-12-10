@@ -1,0 +1,62 @@
+# Sample CrewAI Tool Specification
+# This is an example specification for generating a custom API tool
+
+name: CustomApiTool
+display_name: "API Caller"
+description: "Make HTTP API calls with customizable parameters including headers, query params, and request body"
+category: api
+platforms:
+  - crewai
+
+requirements:
+  - "Support GET, POST, PUT, DELETE HTTP methods"
+  - "Accept custom headers for authentication and content-type"
+  - "Accept query parameters as key-value pairs"
+  - "Accept JSON request body for POST/PUT operations"
+  - "Return structured response with status code and response data"
+  - "Handle errors gracefully and return error information"
+
+inputs:
+  - name: endpoint
+    type: str
+    description: "The specific endpoint path for the API call"
+    required: true
+
+  - name: method
+    type: str
+    description: "HTTP method to use (GET, POST, PUT, DELETE)"
+    required: true
+
+  - name: headers
+    type: "Optional[Dict[str, str]]"
+    description: "HTTP headers to include in the request"
+    required: false
+
+  - name: query_params
+    type: "Optional[Dict[str, Any]]"
+    description: "Query parameters for the request"
+    required: false
+
+  - name: body
+    type: "Optional[Dict[str, Any]]"
+    description: "Body of the request for POST/PUT methods"
+    required: false
+
+config_params:
+  - name: base_url
+    type: "Optional[str]"
+    description: "Base URL for all API requests"
+
+  - name: default_headers
+    type: "Optional[Dict[str, str]]"
+    description: "Default headers to include in all requests"
+
+  - name: default_query_params
+    type: "Optional[Dict[str, Any]]"
+    description: "Default query parameters for all requests"
+
+dependencies:
+  - "requests"
+
+author: "CrewAI Tool Factory"
+version: "1.0.0"

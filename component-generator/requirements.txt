@@ -1,0 +1,22 @@
+# CrewAI Tool Generator Requirements
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# AI & Code Generation
+anthropic==0.39.0
+jinja2==3.1.2
+
+# HTTP Client
+httpx==0.25.1
+
+# Logging
+structlog==23.2.0
+
+# YAML Processing
+pyyaml==6.0.1
+
+# Optional dependencies for enhanced features
+python-multipart==0.0.6
