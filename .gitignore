@@ -227,6 +227,11 @@ component-generator/data/
 component-generator/generated/
 component-generator/test-outputs/
 !component-generator/test-outputs/README.md
+# Generated tools saved to local filesystem for testing
+component-generator/generated_tools/*.py
+component-generator/generated_tools/*.json
+!component-generator/generated_tools/README.md
+*.generated.py
 
 # Reference Tools (Keep the reference tools for RAG)
 # component-index/data/crewai_components/  # KEEP THESE!
