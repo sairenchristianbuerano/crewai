@@ -1,0 +1,594 @@
+# Manual Implementation Templates for CrewAI Tools
+# Using ONLY Python Standard Library (stdlib)
+#
+# Purpose: When external libraries are not supported in CrewAI-Studio,
+# these templates guide Claude AI to generate stdlib-only implementations.
+#
+# Last Updated: 2025-12-11
+# Patterns: 7 (http_client, json_processing, csv_processing, file_operations,
+#             date_time, text_processing, data_structures)
+
+patterns:
+
+  # ==========================================================================
+  # 1. HTTP CLIENT - Requests, HTTPX, urllib3 alternatives
+  # ==========================================================================
+  http_client:
+    description: "HTTP requests using urllib.request and http.client (stdlib)"
+    use_case: "Replace requests, httpx, urllib3 with stdlib"
+    stdlib_modules:
+      - urllib.request
+      - urllib.parse
+      - urllib.error
+      - http.client
+      - json
+      - ssl
+
+    examples:
+      - name: "GET Request"
+        description: "Simple GET request with urllib.request"
+        code: |
+          import urllib.request
+          import urllib.error
+          import json
+          from typing import Dict, Any, Optional
+
+          def http_get(url: str, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+              """
+              Perform HTTP GET request using stdlib urllib
+
+              Args:
+                  url: Target URL
+                  headers: Optional HTTP headers
+
+              Returns:
+                  Response data as dictionary with status, headers, and body
+              """
+              try:
+                  # Create request with headers
+                  req = urllib.request.Request(url)
+                  if headers:
+                      for key, value in headers.items():
+                          req.add_header(key, value)
+
+                  # Execute request
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      status_code = response.status
+                      response_headers = dict(response.headers)
+                      body = response.read().decode('utf-8')
+
+                      # Try to parse as JSON, fallback to text
+                      try:
+                          data = json.loads(body)
+                      except json.JSONDecodeError:
+                          data = body
+
+                      return {
+                          "status_code": status_code,
+                          "headers": response_headers,
+                          "data": data
+                      }
+
+              except urllib.error.HTTPError as e:
+                  return {
+                      "status_code": e.code,
+                      "error": f"HTTP Error {e.code}: {e.reason}"
+                  }
+              except urllib.error.URLError as e:
+                  return {
+                      "status_code": 0,
+                      "error": f"URL Error: {e.reason}"
+                  }
+              except Exception as e:
+                  return {
+                      "status_code": 0,
+                      "error": f"Request failed: {str(e)}"
+                  }
+
+      - name: "POST Request with JSON"
+        description: "POST request with JSON body using urllib.request"
+        code: |
+          import urllib.request
+          import urllib.error
+          import json
+          from typing import Dict, Any
+
+          def http_post_json(url: str, data: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+              """
+              Perform HTTP POST request with JSON body using stdlib urllib
+
+              Args:
+                  url: Target URL
+                  data: Data to send as JSON
+                  headers: Optional HTTP headers
+
+              Returns:
+                  Response data as dictionary
+              """
+              try:
+                  # Prepare JSON data
+                  json_data = json.dumps(data).encode('utf-8')
+
+                  # Create request
+                  req = urllib.request.Request(url, data=json_data, method='POST')
+                  req.add_header('Content-Type', 'application/json')
+
+                  # Add custom headers
+                  if headers:
+                      for key, value in headers.items():
+                          req.add_header(key, value)
+
+                  # Execute request
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      body = response.read().decode('utf-8')
+                      return {
+                          "status_code": response.status,
+                          "data": json.loads(body) if body else None
+                      }
+
+              except urllib.error.HTTPError as e:
+                  error_body = e.read().decode('utf-8', errors='ignore')
+                  return {
+                      "status_code": e.code,
+                      "error": f"HTTP {e.code}: {e.reason}",
+                      "details": error_body
+                  }
+              except Exception as e:
+                  return {
+                      "status_code": 0,
+                      "error": str(e)
+                  }
+
+  # ==========================================================================
+  # 2. JSON PROCESSING - ujson, simplejson, orjson alternatives
+  # ==========================================================================
+  json_processing:
+    description: "JSON parsing and serialization using stdlib json module"
+    use_case: "Replace ujson, simplejson, orjson with stdlib json"
+    stdlib_modules:
+      - json
+      - typing
+
+    examples:
+      - name: "Safe JSON Parsing"
+        description: "Parse JSON with error handling"
+        code: |
+          import json
+          from typing import Any, Optional, Dict
+
+          def safe_json_parse(json_string: str, default: Any = None) -> Any:
+              """
+              Safely parse JSON string with fallback
+
+              Args:
+                  json_string: JSON string to parse
+                  default: Default value if parsing fails
+
+              Returns:
+                  Parsed data or default value
+              """
+              try:
+                  return json.loads(json_string)
+              except json.JSONDecodeError as e:
+                  print(f"JSON parse error: {e}")
+                  return default
+              except Exception as e:
+                  print(f"Unexpected error parsing JSON: {e}")
+                  return default
+
+          def safe_json_dumps(data: Any, pretty: bool = False) -> str:
+              """
+              Safely serialize data to JSON string
+
+              Args:
+                  data: Data to serialize
+                  pretty: Pretty print with indentation
+
+              Returns:
+                  JSON string or error message
+              """
+              try:
+                  if pretty:
+                      return json.dumps(data, indent=2, ensure_ascii=False)
+                  return json.dumps(data, ensure_ascii=False)
+              except TypeError as e:
+                  return json.dumps({"error": f"Serialization error: {str(e)}"})
+
+  # ==========================================================================
+  # 3. CSV PROCESSING - pandas CSV alternatives
+  # ==========================================================================
+  csv_processing:
+    description: "CSV file operations using stdlib csv module"
+    use_case: "Replace pandas CSV operations with stdlib csv"
+    stdlib_modules:
+      - csv
+      - typing
+      - pathlib
+
+    examples:
+      - name: "Read CSV as List of Dictionaries"
+        description: "Read CSV file into list of dicts (like pandas.read_csv)"
+        code: |
+          import csv
+          from typing import List, Dict, Any
+          from pathlib import Path
+
+          def read_csv(file_path: str, encoding: str = 'utf-8') -> List[Dict[str, Any]]:
+              """
+              Read CSV file as list of dictionaries
+
+              Args:
+                  file_path: Path to CSV file
+                  encoding: File encoding (default: utf-8)
+
+              Returns:
+                  List of dictionaries (one per row)
+              """
+              try:
+                  with open(file_path, 'r', encoding=encoding, newline='') as f:
+                      reader = csv.DictReader(f)
+                      return list(reader)
+              except FileNotFoundError:
+                  return []
+              except Exception as e:
+                  print(f"Error reading CSV: {e}")
+                  return []
+
+          def write_csv(file_path: str, data: List[Dict[str, Any]], encoding: str = 'utf-8') -> bool:
+              """
+              Write list of dictionaries to CSV file
+
+              Args:
+                  file_path: Path to CSV file
+                  data: List of dictionaries to write
+                  encoding: File encoding
+
+              Returns:
+                  True if successful, False otherwise
+              """
+              if not data:
+                  return False
+
+              try:
+                  # Get fieldnames from first row
+                  fieldnames = list(data[0].keys())
+
+                  with open(file_path, 'w', encoding=encoding, newline='') as f:
+                      writer = csv.DictWriter(f, fieldnames=fieldnames)
+                      writer.writeheader()
+                      writer.writerows(data)
+
+                  return True
+              except Exception as e:
+                  print(f"Error writing CSV: {e}")
+                  return False
+
+  # ==========================================================================
+  # 4. FILE OPERATIONS - Advanced file handling
+  # ==========================================================================
+  file_operations:
+    description: "File and directory operations using pathlib and shutil"
+    use_case: "Modern file handling with stdlib"
+    stdlib_modules:
+      - pathlib
+      - os
+      - shutil
+      - glob
+
+    examples:
+      - name: "File Operations Helper"
+        description: "Common file operations with pathlib"
+        code: |
+          from pathlib import Path
+          import shutil
+          from typing import List, Optional
+
+          class FileHelper:
+              """Helper class for common file operations using stdlib"""
+
+              @staticmethod
+              def read_text(file_path: str, encoding: str = 'utf-8') -> Optional[str]:
+                  """Read text file content"""
+                  try:
+                      return Path(file_path).read_text(encoding=encoding)
+                  except Exception as e:
+                      print(f"Error reading file: {e}")
+                      return None
+
+              @staticmethod
+              def write_text(file_path: str, content: str, encoding: str = 'utf-8') -> bool:
+                  """Write text to file"""
+                  try:
+                      Path(file_path).write_text(content, encoding=encoding)
+                      return True
+                  except Exception as e:
+                      print(f"Error writing file: {e}")
+                      return False
+
+              @staticmethod
+              def list_files(directory: str, pattern: str = "*") -> List[str]:
+                  """List files matching pattern in directory"""
+                  try:
+                      path = Path(directory)
+                      return [str(f) for f in path.glob(pattern) if f.is_file()]
+                  except Exception as e:
+                      print(f"Error listing files: {e}")
+                      return []
+
+              @staticmethod
+              def ensure_directory(directory: str) -> bool:
+                  """Create directory if it doesn't exist"""
+                  try:
+                      Path(directory).mkdir(parents=True, exist_ok=True)
+                      return True
+                  except Exception as e:
+                      print(f"Error creating directory: {e}")
+                      return False
+
+              @staticmethod
+              def copy_file(src: str, dst: str) -> bool:
+                  """Copy file from src to dst"""
+                  try:
+                      shutil.copy2(src, dst)
+                      return True
+                  except Exception as e:
+                      print(f"Error copying file: {e}")
+                      return False
+
+  # ==========================================================================
+  # 5. DATE/TIME - arrow, pendulum alternatives
+  # ==========================================================================
+  date_time:
+    description: "Date and time operations using stdlib datetime"
+    use_case: "Replace arrow, pendulum with stdlib datetime"
+    stdlib_modules:
+      - datetime
+      - time
+      - calendar
+
+    examples:
+      - name: "Date/Time Helper"
+        description: "Common date/time operations with stdlib"
+        code: |
+          from datetime import datetime, timedelta, timezone
+          from typing import Optional
+
+          class DateTimeHelper:
+              """Helper class for date/time operations using stdlib"""
+
+              @staticmethod
+              def now_iso() -> str:
+                  """Get current timestamp in ISO format"""
+                  return datetime.now(timezone.utc).isoformat()
+
+              @staticmethod
+              def parse_iso(iso_string: str) -> Optional[datetime]:
+                  """Parse ISO format datetime string"""
+                  try:
+                      return datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+                  except Exception as e:
+                      print(f"Error parsing datetime: {e}")
+                      return None
+
+              @staticmethod
+              def format_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+                  """Format datetime with custom format"""
+                  try:
+                      return dt.strftime(format_str)
+                  except Exception as e:
+                      return str(dt)
+
+              @staticmethod
+              def add_days(dt: datetime, days: int) -> datetime:
+                  """Add days to datetime"""
+                  return dt + timedelta(days=days)
+
+              @staticmethod
+              def add_hours(dt: datetime, hours: int) -> datetime:
+                  """Add hours to datetime"""
+                  return dt + timedelta(hours=hours)
+
+              @staticmethod
+              def time_difference(dt1: datetime, dt2: datetime) -> timedelta:
+                  """Calculate time difference between two datetimes"""
+                  return abs(dt2 - dt1)
+
+              @staticmethod
+              def is_past(dt: datetime) -> bool:
+                  """Check if datetime is in the past"""
+                  return dt < datetime.now(timezone.utc)
+
+  # ==========================================================================
+  # 6. TEXT PROCESSING - Advanced regex and string operations
+  # ==========================================================================
+  text_processing:
+    description: "Text processing and regex using stdlib"
+    use_case: "Advanced text operations with re and string modules"
+    stdlib_modules:
+      - re
+      - string
+      - textwrap
+
+    examples:
+      - name: "Text Processing Helper"
+        description: "Common text operations with stdlib"
+        code: |
+          import re
+          import string
+          from typing import List, Optional
+
+          class TextHelper:
+              """Helper class for text processing using stdlib"""
+
+              @staticmethod
+              def extract_emails(text: str) -> List[str]:
+                  """Extract email addresses from text"""
+                  pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                  return re.findall(pattern, text)
+
+              @staticmethod
+              def extract_urls(text: str) -> List[str]:
+                  """Extract URLs from text"""
+                  pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+                  return re.findall(pattern, text)
+
+              @staticmethod
+              def clean_whitespace(text: str) -> str:
+                  """Remove extra whitespace from text"""
+                  return ' '.join(text.split())
+
+              @staticmethod
+              def remove_punctuation(text: str) -> str:
+                  """Remove all punctuation from text"""
+                  return text.translate(str.maketrans('', '', string.punctuation))
+
+              @staticmethod
+              def truncate(text: str, max_length: int, suffix: str = "...") -> str:
+                  """Truncate text to max length with suffix"""
+                  if len(text) <= max_length:
+                      return text
+                  return text[:max_length - len(suffix)] + suffix
+
+              @staticmethod
+              def find_pattern(text: str, pattern: str) -> List[str]:
+                  """Find all matches of regex pattern in text"""
+                  try:
+                      return re.findall(pattern, text)
+                  except re.error as e:
+                      print(f"Invalid regex pattern: {e}")
+                      return []
+
+  # ==========================================================================
+  # 7. DATA STRUCTURES - Advanced data structures
+  # ==========================================================================
+  data_structures:
+    description: "Advanced data structures using collections and dataclasses"
+    use_case: "Efficient data structures with stdlib"
+    stdlib_modules:
+      - collections
+      - dataclasses
+      - typing
+
+    examples:
+      - name: "Data Structure Helpers"
+        description: "Common data structures with stdlib"
+        code: |
+          from collections import defaultdict, Counter, deque, namedtuple
+          from dataclasses import dataclass, field
+          from typing import List, Dict, Any, Optional
+
+          # Named tuple for simple data
+          Point = namedtuple('Point', ['x', 'y'])
+
+          # Dataclass for structured data
+          @dataclass
+          class Record:
+              """Example dataclass for structured data"""
+              id: str
+              name: str
+              metadata: Dict[str, Any] = field(default_factory=dict)
+              tags: List[str] = field(default_factory=list)
+
+              def to_dict(self) -> Dict[str, Any]:
+                  """Convert to dictionary"""
+                  return {
+                      'id': self.id,
+                      'name': self.name,
+                      'metadata': self.metadata,
+                      'tags': self.tags
+                  }
+
+          class DataStructureHelper:
+              """Helper class for common data structure operations"""
+
+              @staticmethod
+              def count_items(items: List[Any]) -> Dict[Any, int]:
+                  """Count occurrences of items"""
+                  return dict(Counter(items))
+
+              @staticmethod
+              def group_by_key(items: List[Dict[str, Any]], key: str) -> Dict[Any, List[Dict[str, Any]]]:
+                  """Group items by key value"""
+                  grouped = defaultdict(list)
+                  for item in items:
+                      if key in item:
+                          grouped[item[key]].append(item)
+                  return dict(grouped)
+
+              @staticmethod
+              def deduplicate(items: List[Any]) -> List[Any]:
+                  """Remove duplicates while preserving order"""
+                  seen = set()
+                  result = []
+                  for item in items:
+                      # Handle unhashable types
+                      try:
+                          if item not in seen:
+                              seen.add(item)
+                              result.append(item)
+                      except TypeError:
+                          # For unhashable types, just check if in result
+                          if item not in result:
+                              result.append(item)
+                  return result
+
+# ==========================================================================
+# INTEGRATION GUIDELINES
+# ==========================================================================
+integration_guidelines: |
+  When generating tools with unsupported dependencies:
+
+  1. **Identify the pattern** - Match unsupported library to one of the 7 patterns
+  2. **Use the template** - Copy relevant example code from this file
+  3. **Adapt to requirements** - Modify the template to match tool specification
+  4. **Add error handling** - Ensure robust error handling throughout
+  5. **Document clearly** - Add docstrings explaining the manual implementation
+  6. **Test edge cases** - Consider common failure scenarios
+
+  **Example:**
+  If a tool requires 'requests' library (unsupported), use the 'http_client' pattern:
+  - Copy the http_get() or http_post_json() function
+  - Adapt parameters to match tool requirements
+  - Add custom error handling if needed
+  - Document that it's a manual implementation using urllib
+
+  **Quality Guidelines:**
+  - Always use type hints
+  - Include comprehensive docstrings
+  - Handle errors gracefully with try/except
+  - Return structured data (dicts) for consistency
+  - Keep functions focused and simple
+  - Use descriptive variable names
+  - Follow PEP 8 style guide
+
+# ==========================================================================
+# COMMON PATTERNS REFERENCE
+# ==========================================================================
+common_patterns_reference:
+  http_requests:
+    - "Use urllib.request for HTTP GET/POST"
+    - "Use urllib.parse for URL encoding"
+    - "Always set timeout (default 30s)"
+    - "Handle HTTPError and URLError separately"
+    - "Try to parse response as JSON, fallback to text"
+
+  json_operations:
+    - "Use json.loads() for parsing"
+    - "Use json.dumps() for serialization"
+    - "Always handle JSONDecodeError"
+    - "Set ensure_ascii=False for international characters"
+    - "Use indent=2 for pretty printing"
+
+  file_handling:
+    - "Use pathlib.Path for modern file operations"
+    - "Use 'with' statements for automatic file closing"
+    - "Set encoding explicitly (usually 'utf-8')"
+    - "Create directories with parents=True, exist_ok=True"
+    - "Use Path.glob() for pattern matching"
+
+  error_handling:
+    - "Always use try/except blocks"
+    - "Return structured error responses (dicts)"
+    - "Log errors with descriptive messages"
+    - "Provide default/fallback values"
+    - "Never let exceptions bubble up unhandled"
