@@ -4,6 +4,7 @@ CrewAI Tool Generator using Claude AI
 
 import os
 import json
+import yaml
 from typing import Optional, Dict, Any
 import structlog
 from anthropic import Anthropic
@@ -15,6 +16,8 @@ from base_classes import (
     BaseCodeGenerator
 )
 from crewai_validator import CrewAIToolValidator
+from dependency_validator import DependencyValidator, get_validation_summary
+from pattern_matcher import PatternMatcher, get_pattern_report
 
 logger = structlog.get_logger()
 
@@ -48,7 +51,104 @@ class CrewAIToolGenerator(BaseCodeGenerator):
 
         self.client = Anthropic(api_key=self.api_key)
         self.validator = CrewAIToolValidator()
+        self.dependency_validator = DependencyValidator()
+        self.pattern_matcher = PatternMatcher()
         self.logger = logger.bind(component="crewai_generator")
+
+        # Load manual implementation templates
+        self.manual_implementations = self._load_manual_implementations()
+
+    def _load_manual_implementations(self) -> Dict[str, Any]:
+        """Load manual implementation templates from YAML file"""
+        try:
+            templates_path = os.path.join(
+                os.path.dirname(__file__),
+                'manual_implementations.yaml'
+            )
+
+            if not os.path.exists(templates_path):
+                self.logger.warning(
+                    "Manual implementations file not found",
+                    path=templates_path
+                )
+                return {}
+
+            with open(templates_path, 'r', encoding='utf-8') as f:
+                templates = yaml.safe_load(f)
+
+            self.logger.info(
+                "Manual implementation templates loaded",
+                patterns_count=len(templates.get('patterns', {}))
+            )
+
+            return templates
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to load manual implementations",
+                error=str(e)
+            )
+            return {}
+
+    def _get_manual_implementation_templates(self, unsupported_deps: list) -> str:
+        """
+        Get relevant code templates for unsupported dependencies
+
+        Args:
+            unsupported_deps: List of unsupported dependency names
+
+        Returns:
+            Formatted string with code templates and guidelines
+        """
+        if not self.manual_implementations or not unsupported_deps:
+            return ""
+
+        templates_text = ""
+        patterns_data = self.manual_implementations.get('patterns', {})
+        added_patterns = set()
+
+        for dep in unsupported_deps:
+            # Get pattern guide
+            guide = self.dependency_validator.get_manual_implementation_guide(dep)
+            pattern_name = guide['pattern']
+
+            # Skip if we've already added this pattern
+            if pattern_name in added_patterns:
+                continue
+
+            # Get pattern data from templates
+            pattern_data = patterns_data.get(pattern_name)
+
+            if pattern_data:
+                templates_text += f"\n**📘 Code Templates for '{pattern_name}' Pattern:**\n"
+                templates_text += f"**Use Case:** {pattern_data.get('description', 'N/A')}\n"
+                templates_text += f"**Stdlib Modules:** {', '.join(pattern_data.get('stdlib_modules', []))}\n\n"
+
+                # Add code examples
+                examples = pattern_data.get('examples', [])
+                for i, example in enumerate(examples[:2], 1):  # Limit to 2 examples per pattern
+                    templates_text += f"**Example {i}: {example.get('name', 'N/A')}**\n"
+                    templates_text += f"_{example.get('description', '')}_\n\n"
+                    templates_text += "```python\n"
+                    templates_text += example.get('code', '').strip()
+                    templates_text += "\n```\n\n"
+
+                added_patterns.add(pattern_name)
+            else:
+                # Fallback to basic guide info
+                templates_text += f"\n**Manual Implementation for '{dep}':**\n"
+                templates_text += f"- Pattern: {guide['pattern']}\n"
+                templates_text += f"- Description: {guide['description']}\n"
+                templates_text += f"- Recommended stdlib modules: {', '.join(guide['recommended_stdlib'])}\n"
+                templates_text += f"- Approach: {guide['implementation_approach']}\n\n"
+
+        # Add integration guidelines if available
+        if templates_text and self.manual_implementations.get('integration_guidelines'):
+            templates_text += "\n**🎯 Integration Guidelines:**\n"
+            templates_text += self.manual_implementations['integration_guidelines'].strip()
+            templates_text += "\n\n"
+
+        return templates_text
 
     async def generate_tool(self, spec: ToolSpec) -> GeneratedTool:
         """
@@ -62,10 +162,54 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         """
         self.logger.info("Starting tool generation", tool_name=spec.name)
 
-        # 1. Retrieve similar patterns from RAG (if available)
+        # 1. Validate dependencies
+        self.logger.info("=" * 80)
+        self.logger.info("Validating dependencies...")
+        self.logger.info("=" * 80)
+        dependency_validation = self.dependency_validator.validate(
+            spec.dependencies if spec.dependencies else []
+        )
+
+        # Log validation summary
+        validation_summary = get_validation_summary(dependency_validation)
+        self.logger.info(
+            "Dependency validation completed",
+            total_dependencies=len(dependency_validation.supported) + len(dependency_validation.unsupported),
+            supported_count=len(dependency_validation.supported),
+            unsupported_count=len(dependency_validation.unsupported),
+            stdlib_count=len(dependency_validation.stdlib),
+            external_count=len(dependency_validation.external),
+            severity=dependency_validation.severity,
+            manual_implementation_needed=dependency_validation.manual_implementation_needed
+        )
+        print(validation_summary)  # Print to console for visibility
+
+        # Log individual warnings
+        if dependency_validation.warnings:
+            self.logger.warning("Dependency validation warnings detected")
+            for warning in dependency_validation.warnings:
+                self.logger.warning("Dependency warning", message=warning)
+
+        # Log suggestions
+        if dependency_validation.suggestions:
+            self.logger.info("Dependency validation suggestions available")
+            for suggestion in dependency_validation.suggestions:
+                self.logger.info("Dependency suggestion", message=suggestion)
+
+        # Check if we can proceed
+        if not dependency_validation.can_proceed:
+            self.logger.error(
+                "Cannot proceed with unsupported dependencies in strict mode",
+                unsupported=dependency_validation.unsupported
+            )
+            raise ValueError(
+                f"Unsupported dependencies: {', '.join(dependency_validation.unsupported)}"
+            )
+
+        # 2. Retrieve similar patterns from RAG (if available)
         rag_context = await self._retrieve_similar_components(spec)
 
-        # 2. Generate code using Claude
+        # 3. Generate code using Claude
         generated_code = None
         validation_result = None
         attempt = 0
@@ -79,6 +223,7 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             generated_code = await self._generate_code_with_claude(
                 spec,
                 rag_context,
+                dependency_validation=dependency_validation,
                 previous_errors=validation_result.errors if validation_result else None
             )
 
@@ -120,12 +265,21 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             doc_size=len(documentation)
         )
 
-        # 4. Create deployment instructions
+        # 4. Create deployment instructions with dependency validation
         deployment_instructions = {
             "usage": f"from generated_tools.{spec.name.lower()} import {spec.name}",
             "dependencies": spec.dependencies,
-            "install_command": f"pip install {' '.join(spec.dependencies)}" if spec.dependencies else None
+            "install_command": f"pip install {' '.join(spec.dependencies)}" if spec.dependencies else None,
+            "dependency_validation": dependency_validation.to_dict()
         }
+
+        # Add warnings if dependencies are unsupported
+        if dependency_validation.unsupported:
+            deployment_instructions["warnings"] = dependency_validation.warnings
+            deployment_instructions["manual_implementation_note"] = (
+                "Some dependencies are not supported in CrewAI-Studio. "
+                "The generated code uses manual implementations with Python stdlib."
+            )
 
         # 5. Create the complete response object
         generated_tool = GeneratedTool(
@@ -185,12 +339,18 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         self,
         spec: ToolSpec,
         rag_context: Dict[str, Any],
+        dependency_validation,
         previous_errors: Optional[list] = None
     ) -> str:
         """Generate tool code using Claude AI"""
 
         # Build the prompt
-        prompt = self._build_generation_prompt(spec, rag_context, previous_errors)
+        prompt = self._build_generation_prompt(
+            spec,
+            rag_context,
+            dependency_validation,
+            previous_errors
+        )
 
         self.logger.debug("Sending request to Claude", model=self.model)
 
@@ -223,6 +383,7 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         self,
         spec: ToolSpec,
         rag_context: Dict[str, Any],
+        dependency_validation,
         previous_errors: Optional[list] = None
     ) -> str:
         """Build the prompt for Claude"""
@@ -252,8 +413,65 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             for param in spec.config_params:
                 prompt += f"- **{param['name']}** ({param.get('type', 'str')}): {param.get('description', '')}\n"
 
+        # Add dependency validation information
         if spec.dependencies:
-            prompt += f"\n## Dependencies\n{', '.join(spec.dependencies)}\n"
+            prompt += "\n## Dependencies & Validation\n"
+
+            if dependency_validation.all_supported:
+                prompt += "✅ **All dependencies are supported in CrewAI-Studio environment:**\n"
+                for dep in dependency_validation.supported:
+                    if dep in dependency_validation.stdlib:
+                        prompt += f"- {dep} (Python stdlib - always available)\n"
+                    else:
+                        prompt += f"- {dep} (supported)\n"
+            else:
+                prompt += "⚠️ **Dependency Validation Results:**\n\n"
+
+                if dependency_validation.supported:
+                    prompt += "**✅ Supported (you can use these):**\n"
+                    for dep in dependency_validation.supported:
+                        if dep in dependency_validation.stdlib:
+                            prompt += f"- {dep} (Python stdlib)\n"
+                        else:
+                            prompt += f"- {dep}\n"
+                    prompt += "\n"
+
+                if dependency_validation.unsupported:
+                    prompt += "**❌ Unsupported (DO NOT import these directly):**\n"
+                    for dep in dependency_validation.unsupported:
+                        prompt += f"- {dep}\n"
+                        alts = dependency_validation.alternatives.get(dep, [])
+                        if alts:
+                            prompt += f"  → Alternatives: {', '.join(alts)}\n"
+                    prompt += "\n"
+
+                    prompt += "**🔧 IMPORTANT - Manual Implementation Required:**\n"
+                    prompt += "For unsupported dependencies, you MUST implement the functionality manually "
+                    prompt += "using ONLY Python standard library (stdlib) modules.\n\n"
+                    prompt += "**Manual Implementation Guidelines:**\n"
+                    prompt += "1. Use ONLY Python stdlib modules (os, json, datetime, urllib, http.client, etc.)\n"
+                    prompt += "2. Do NOT import any unsupported libraries\n"
+                    prompt += "3. Keep implementations simple and focused\n"
+                    prompt += "4. Add clear docstrings explaining the manual implementation\n"
+                    prompt += "5. Include proper error handling\n\n"
+
+                    # Add code templates for unsupported dependencies
+                    prompt += self._get_manual_implementation_templates(
+                        dependency_validation.unsupported
+                    )
+
+            # Add warnings and suggestions
+            if dependency_validation.warnings:
+                prompt += "\n**⚠️ Warnings:**\n"
+                for warning in dependency_validation.warnings:
+                    prompt += f"- {warning}\n"
+
+            if dependency_validation.suggestions:
+                prompt += "\n**💡 Suggestions:**\n"
+                for suggestion in dependency_validation.suggestions:
+                    prompt += f"- {suggestion}\n"
+
+            prompt += "\n"
 
         # Add similar patterns if available
         if rag_context.get('results'):
@@ -383,8 +601,47 @@ Generate **ONLY the Python code**, no explanations. Start directly with imports.
         return response.strip()
 
     async def validate_tool(self, code: str) -> ValidationResult:
-        """Validate generated tool code"""
-        return self.validator.validate(code)
+        """Validate generated tool code with AST and pattern matching"""
+        # Run AST validation
+        ast_validation = self.validator.validate(code)
+
+        # Run pattern matching
+        pattern_result = self.pattern_matcher.analyze(code)
+
+        # Log pattern matching results
+        self.logger.info(
+            "Pattern validation completed",
+            matches_pattern=pattern_result.matches_pattern,
+            pattern_score=pattern_result.pattern_score
+        )
+
+        # Print pattern report to console
+        pattern_report = get_pattern_report(pattern_result)
+        print("\n" + pattern_report)
+
+        # Combine validations - tool is valid if both pass
+        combined_errors = ast_validation.errors.copy()
+        combined_warnings = ast_validation.warnings.copy()
+        combined_suggestions = ast_validation.suggestions.copy()
+
+        # Add pattern matching issues
+        if pattern_result.issues:
+            combined_errors.extend(pattern_result.issues)
+        if pattern_result.warnings:
+            combined_warnings.extend(pattern_result.warnings)
+        if pattern_result.suggestions:
+            combined_suggestions.extend(pattern_result.suggestions)
+
+        # Tool is valid if AST is valid AND pattern score >= 70
+        is_valid = ast_validation.is_valid and pattern_result.pattern_score >= 70
+
+        # Create enhanced validation result
+        return ValidationResult(
+            is_valid=is_valid,
+            errors=combined_errors,
+            warnings=combined_warnings,
+            suggestions=combined_suggestions
+        )
 
     def _generate_documentation(self, spec: ToolSpec, code: str) -> str:
         """Generate usage documentation for the tool"""
