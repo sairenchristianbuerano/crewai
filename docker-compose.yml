@@ -1,0 +1,70 @@
+# Docker Compose for CrewAI Component Generation Services
+
+version: '3.8'
+
+services:
+  # Component Generator Service
+  component-generator:
+    build:
+      context: ./component-generator
+      dockerfile: Dockerfile
+    container_name: crewai-component-generator
+    ports:
+      - "8085:8085"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      - PORT=8085
+      - RAG_SERVICE_URL=http://component-index:8086
+      - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
+    volumes:
+      - generator_data:/app/data
+    networks:
+      - crewai_network
+    depends_on:
+      - component-index
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8085/api/crewai/tool-generator/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Component Index Service
+  component-index:
+    build:
+      context: ./component-index
+      dockerfile: Dockerfile
+    container_name: crewai-component-index
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - STORAGE_PATH=/app/data/components
+      - TOOLS_DIR=/app/data/crewai_components/tools
+      - CHROMADB_DIR=/app/data/chromadb
+      - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
+    volumes:
+      - index_data:/app/data
+      # Mount existing tools from CrewAI-Studio for pattern search
+      - ${CREWAI_STUDIO_TOOLS_PATH:-./component-index/data/crewai_components}:/app/data/crewai_components:ro
+    networks:
+      - crewai_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8086/api/crewai/tool-index/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  crewai_network:
+    driver: bridge
+
+volumes:
+  generator_data:
+    driver: local
+  index_data:
+    driver: local

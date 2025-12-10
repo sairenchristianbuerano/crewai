@@ -1,0 +1,43 @@
+# Sample: Search Tool Specification
+
+name: WebSearchTool
+display_name: "Web Search"
+description: "Search the web using DuckDuckGo and return relevant results with titles, snippets, and URLs"
+category: search
+platforms:
+  - crewai
+
+requirements:
+  - "Perform web searches using DuckDuckGo"
+  - "Return formatted results with titles, snippets, and URLs"
+  - "Support limiting the number of results"
+  - "Support regional search preferences"
+  - "Support safe search filtering"
+  - "Handle search errors gracefully"
+
+inputs:
+  - name: query
+    type: str
+    description: "The search query string"
+    required: true
+
+  - name: max_results
+    type: int
+    description: "Maximum number of results to return"
+    required: false
+
+  - name: region
+    type: str
+    description: "Region code for localized results (e.g., 'us-en', 'fr-fr')"
+    required: false
+
+  - name: safesearch
+    type: str
+    description: "SafeSearch setting (off, moderate, strict)"
+    required: false
+
+dependencies:
+  - "duckduckgo-search"
+
+author: "CrewAI Tool Factory"
+version: "1.0.0"
