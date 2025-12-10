@@ -119,7 +119,8 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             "install_command": f"pip install {' '.join(spec.dependencies)}" if spec.dependencies else None
         }
 
-        return GeneratedTool(
+        # 5. Create the complete response object
+        generated_tool = GeneratedTool(
             tool_code=generated_code,
             tool_config={
                 "name": spec.name,
@@ -133,6 +134,11 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             documentation=documentation,
             deployment_instructions=deployment_instructions
         )
+
+        # 6. Save complete JSON response to file (like Flowise)
+        self._save_generation_response_to_json(spec.name, generated_tool)
+
+        return generated_tool
 
     async def _retrieve_similar_components(self, spec: ToolSpec) -> Dict[str, Any]:
         """Retrieve similar tool patterns from RAG service"""
@@ -487,6 +493,62 @@ print(result)
         except Exception as e:
             self.logger.warning(
                 "Failed to save generated tool to file",
+                tool_name=tool_name,
+                error=str(e)
+            )
+
+    def _save_generation_response_to_json(self, tool_name: str, generated_tool):
+        """
+        Save complete generation response to JSON file (like Flowise)
+
+        Args:
+            tool_name: Name of the tool
+            generated_tool: GeneratedTool object with complete response
+        """
+        try:
+            import json
+            from datetime import datetime
+
+            # Create generated_tools directory if it doesn't exist
+            output_dir = os.path.join("/app/data", "generated_tools")
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{tool_name}_response.json"
+            filepath = os.path.join(output_dir, filename)
+
+            # Convert to dict for JSON serialization
+            response_data = {
+                "tool_code": generated_tool.tool_code,
+                "tool_config": generated_tool.tool_config,
+                "dependencies": generated_tool.dependencies,
+                "validation": {
+                    "is_valid": generated_tool.validation.is_valid,
+                    "errors": generated_tool.validation.errors,
+                    "warnings": generated_tool.validation.warnings,
+                    "suggestions": generated_tool.validation.suggestions
+                } if generated_tool.validation else None,
+                "documentation": generated_tool.documentation,
+                "deployment_instructions": generated_tool.deployment_instructions,
+                "generated_at": datetime.now().isoformat(),
+                "platform": "crewai"
+            }
+
+            # Write JSON to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(response_data, f, indent=2, ensure_ascii=False)
+
+            self.logger.info(
+                "Complete response saved to JSON",
+                tool_name=tool_name,
+                filepath=filepath,
+                file_size=len(json.dumps(response_data))
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to save response to JSON",
                 tool_name=tool_name,
                 error=str(e)
             )
