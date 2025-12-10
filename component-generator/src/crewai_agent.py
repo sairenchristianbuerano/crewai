@@ -110,7 +110,15 @@ class CrewAIToolGenerator(BaseCodeGenerator):
                 break
 
         # 3. Generate documentation
+        self.logger.info("=" * 80)
+        self.logger.info("Generating documentation...")
+        self.logger.info("=" * 80)
         documentation = self._generate_documentation(spec, generated_code)
+        self.logger.info(
+            "Documentation generated successfully",
+            tool_name=spec.name,
+            doc_size=len(documentation)
+        )
 
         # 4. Create deployment instructions
         deployment_instructions = {
