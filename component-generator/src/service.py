@@ -153,6 +153,79 @@ async def generate_tool_endpoint(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/crewai/tool-generator/generate/sample")
+async def generate_sample_tool_endpoint():
+    """
+    Generate a sample crewAI tool using built-in specification
+
+    No request body required. Uses a pre-defined sample specification
+    to demonstrate the tool generation capabilities.
+
+    Response:
+    {
+        "code": "<Generated Python code>",
+        "documentation": "<Tool usage documentation>",
+        "validation": {...},
+        "dependencies": [...],
+        "deployment_instructions": {...}
+    }
+    """
+    if not generator:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    try:
+        # Load sample specification from file
+        sample_spec_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "sample_spec.yaml"
+        )
+
+        with open(sample_spec_path, "r") as f:
+            sample_spec_yaml = f.read()
+
+        logger.info("Generating sample tool from built-in specification")
+        spec_dict = yaml.safe_load(sample_spec_yaml)
+
+        # Convert to ToolSpec
+        spec = ToolSpec(**spec_dict)
+
+        logger.info("Generating sample crewAI tool", tool_name=spec.name)
+        result = await generator.generate_tool(spec)
+
+        logger.info(
+            "Sample tool generated successfully",
+            tool_name=spec.name,
+            code_size=len(result.tool_code),
+            is_valid=result.validation.is_valid
+        )
+
+        # Return complete response
+        return {
+            "code": result.tool_code,
+            "documentation": result.documentation or "",
+            "validation": {
+                "is_valid": result.validation.is_valid,
+                "errors": result.validation.errors,
+                "warnings": result.validation.warnings,
+                "suggestions": result.validation.suggestions
+            },
+            "dependencies": result.dependencies,
+            "deployment_instructions": result.deployment_instructions,
+            "tool_config": result.tool_config
+        }
+
+    except FileNotFoundError:
+        logger.error("Sample specification file not found")
+        raise HTTPException(status_code=500, detail="Sample specification file not found")
+    except yaml.YAMLError as e:
+        logger.error("Sample YAML parsing failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Invalid sample YAML: {str(e)}")
+    except Exception as e:
+        logger.error("Sample tool generation failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/crewai/tool-generator/assess")
 async def assess_feasibility_endpoint(request: GenerateRequest):
     """

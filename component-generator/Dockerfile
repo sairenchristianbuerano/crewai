@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY src/ ./src/
 COPY templates/ ./templates/
+COPY sample_spec.yaml .
 
 # Create data directory
 RUN mkdir -p /app/data
