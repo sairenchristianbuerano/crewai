@@ -14,6 +14,7 @@
 - [Component Generator API](#component-generator-api)
   - [Health Check](#generator-health-check)
   - [Generate Tool](#generate-tool)
+  - [Generate Sample Tool](#generate-sample-tool)
   - [Assess Feasibility](#assess-feasibility)
 - [Component Index API](#component-index-api)
   - [Health Check](#index-health-check)
@@ -170,6 +171,79 @@ version: "1.0.0"
   "detail": "Generator not initialized"
 }
 ```
+
+---
+
+### Generate Sample Tool
+
+Generate a sample crewAI tool using a built-in specification file.
+
+```http
+POST /api/crewai/tool-generator/generate/sample
+Content-Type: application/json
+```
+
+**Request Body:** None required
+
+**Description:**
+This endpoint demonstrates the tool generation capabilities by generating a sample tool from a pre-defined specification. No request body is needed - the endpoint uses a built-in sample specification file.
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:8085/api/crewai/tool-generator/generate/sample \
+  -H "Content-Type: application/json"
+```
+
+**Response 200:**
+```json
+{
+  "code": "from typing import Optional, Dict, Any, Type\nfrom crewai.tools import BaseTool\n...",
+  "documentation": "# PlaygroundCalculator\n\nVersion: 1.0.0\n...",
+  "validation": {
+    "is_valid": true,
+    "errors": [],
+    "warnings": [],
+    "suggestions": []
+  },
+  "dependencies": ["math", "numpy"],
+  "deployment_instructions": {
+    "usage": "from generated_tools.playgroundcalculator import PlaygroundCalculator",
+    "dependencies": ["math", "numpy"],
+    "install_command": "pip install numpy"
+  },
+  "tool_config": {
+    "name": "PlaygroundCalculator",
+    "display_name": "Playground Calculator",
+    "category": "tools",
+    "version": "1.0.0",
+    "author": "CrewAI Component Factory"
+  }
+}
+```
+
+**Response Fields:** Same as `/generate` endpoint
+
+**Error Responses:**
+
+**500 Internal Server Error:**
+```json
+{
+  "detail": "Sample specification file not found"
+}
+```
+
+**503 Service Unavailable:**
+```json
+{
+  "detail": "Generator not initialized"
+}
+```
+
+**Use Cases:**
+- Testing the API without creating a specification
+- Seeing a reference example of generated code
+- Validating the service is working correctly
+- Understanding the response format
 
 ---
 
