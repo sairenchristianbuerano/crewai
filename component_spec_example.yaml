@@ -1,4 +1,5 @@
-# Sample: Search Tool Specification
+# Sample: CrewAI Component Specification
+# This is an example specification for generating custom CrewAI components
 
 name: WebSearchTool
 display_name: "Web Search"
@@ -39,5 +40,5 @@ inputs:
 dependencies:
   - "duckduckgo-search"
 
-author: "CrewAI Tool Factory"
+author: "CrewAI Component Factory"
 version: "1.0.0"
