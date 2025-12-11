@@ -214,8 +214,6 @@ docker-volumes/
 # Component Data & Generated Files
 # ============================================
 # Component Index Data (Generated at runtime)
-component-index/data/components/
-component-index/data/chromadb/
 !component-index/data/components/.gitkeep
 !component-index/data/chromadb/.gitkeep
 
