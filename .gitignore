@@ -219,6 +219,11 @@ component-index/data/chromadb/
 !component-index/data/components/.gitkeep
 !component-index/data/chromadb/.gitkeep
 
+# Deprecated component directories (migrated to crewai_components/)
+component-index/data/crewai_studio_components/
+component-index/data/official_crewai_tools/
+component-index/data/tools/
+
 # Component Generator Data
 component-generator/data/
 !component-generator/data/.gitkeep
