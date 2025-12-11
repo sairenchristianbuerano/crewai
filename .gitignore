@@ -244,9 +244,16 @@ component-generator/generated_tools/*.json
 # ============================================
 # Service-Specific
 # ============================================
-# Standalone mode PID files
+# Standalone mode files
 .component-index.pid
 .component-generator.pid
+.env.standalone
+component-index.log
+component-generator.log
+
+# Standalone virtual environments
+component-index/venv/
+component-generator/venv/
 
 # Service locks
 *.lock

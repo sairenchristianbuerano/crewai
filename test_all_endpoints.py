@@ -9,11 +9,15 @@ Tests all CrewAI Component Generator endpoints to verify:
 
 Usage:
     python test_all_endpoints.py
+    python test_all_endpoints.py --generator-port 8085 --index-port 8086
+    python test_all_endpoints.py --generator-url http://localhost:8085 --index-url http://localhost:8086
 """
 
 import requests
 import json
 import yaml
+import argparse
+import os
 from datetime import datetime
 from typing import Dict, Any
 
@@ -454,5 +458,66 @@ class TestIndexTool(BaseTool):
 
 
 if __name__ == "__main__":
-    tester = EndpointTester()
+    parser = argparse.ArgumentParser(
+        description="Test CrewAI Component Generator and Index endpoints",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test default ports (Docker mode)
+  python test_all_endpoints.py
+
+  # Test custom ports (standalone mode)
+  python test_all_endpoints.py --generator-port 8085 --index-port 8086
+
+  # Test with full URLs
+  python test_all_endpoints.py --generator-url http://localhost:9085 --index-url http://localhost:9086
+
+  # Use environment variables
+  export GENERATOR_URL=http://localhost:8085
+  export INDEX_URL=http://localhost:8086
+  python test_all_endpoints.py
+        """
+    )
+
+    parser.add_argument(
+        "--generator-url",
+        default=os.getenv("GENERATOR_URL", "http://localhost:8085"),
+        help="Full URL of the component-generator service (default: http://localhost:8085)"
+    )
+
+    parser.add_argument(
+        "--index-url",
+        default=os.getenv("INDEX_URL", "http://localhost:8086"),
+        help="Full URL of the component-index service (default: http://localhost:8086)"
+    )
+
+    parser.add_argument(
+        "--generator-port",
+        type=int,
+        help="Port for component-generator (overrides --generator-url)"
+    )
+
+    parser.add_argument(
+        "--index-port",
+        type=int,
+        help="Port for component-index (overrides --index-url)"
+    )
+
+    args = parser.parse_args()
+
+    # Port arguments override URL arguments
+    generator_url = args.generator_url
+    index_url = args.index_url
+
+    if args.generator_port:
+        generator_url = f"http://localhost:{args.generator_port}"
+
+    if args.index_port:
+        index_url = f"http://localhost:{args.index_port}"
+
+    print(f"\nTesting endpoints:")
+    print(f"  Generator: {generator_url}")
+    print(f"  Index:     {index_url}\n")
+
+    tester = EndpointTester(generator_url=generator_url, index_url=index_url)
     tester.run_all_tests()
