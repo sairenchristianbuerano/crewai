@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     logger.info("Tool storage initialized", path=storage_path)
 
     # Initialize RAG pattern engine
-    tools_directory = os.getenv("TOOLS_DIR", "/app/data/crewai_studio_components/tools")
+    tools_directory = os.getenv("TOOLS_DIR", "/app/data/crewai_components")
     chromadb_dir = os.getenv("CHROMADB_DIR", "/app/data/chromadb")
 
     try:
