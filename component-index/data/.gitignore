@@ -1,0 +1,13 @@
+# ChromaDB vector database files (regeneratable from components)
+chromadb/
+
+# Runtime component registry (generated at runtime)
+components/
+
+# Old directories (deprecated)
+crewai_studio_components/
+official_crewai_tools/
+tools/
+
+# Keep crewai_components/ directory (source files - should be committed)
+!crewai_components/

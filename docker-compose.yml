@@ -44,15 +44,12 @@ services:
     environment:
       - PORT=8086
       - STORAGE_PATH=/app/data/components
-      - TOOLS_DIR=/app/data/crewai_components/tools
+      - TOOLS_DIR=/app/data/crewai_components
       - CHROMADB_DIR=/app/data/chromadb
       - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
     volumes:
-      - index_data:/app/data
-      # Mount existing tools from CrewAI-Studio for pattern search
-      - ${CREWAI_STUDIO_TOOLS_PATH:-./component-index/data/crewai_components}:/app/data/crewai_components:ro
-      # Mount official crewAI tools for indexing
-      - C:\Users\Joana\Desktop\sairen-files\github\env\crewAI\lib\crewai-tools\src\crewai_tools\tools:/app/data/official_tools:ro
+      # Mount entire data directory with unified components
+      - ./component-index/data:/app/data
     networks:
       - crewai_network
     restart: unless-stopped

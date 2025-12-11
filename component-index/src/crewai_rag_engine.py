@@ -18,14 +18,14 @@ class CrewAIRAGEngine:
 
     def __init__(
         self,
-        tools_directory: str = "/app/data/crewai_components/tools",
+        tools_directory: str = "/app/data/crewai_components",
         persist_directory: str = "/app/data/chromadb"
     ):
         """
         Initialize the RAG engine
 
         Args:
-            tools_directory: Directory containing reference tool implementations
+            tools_directory: Directory containing reference tool implementations (with official/ and studio/ subdirectories)
             persist_directory: Directory for ChromaDB persistence
         """
         self.tools_dir = Path(tools_directory)
@@ -85,12 +85,13 @@ class CrewAIRAGEngine:
             self.logger.info("Tools already indexed", count=existing_count)
             return existing_count
 
-        # Find all Python files in tools directory
+        # Find all Python files in tools directory (recursively scan official/ and studio/ subdirectories)
         if not self.tools_dir.exists():
             self.logger.warning("Tools directory does not exist", path=str(self.tools_dir))
             return 0
 
-        tool_files = list(self.tools_dir.glob("*.py"))
+        # Recursively find all .py files in subdirectories
+        tool_files = list(self.tools_dir.rglob("*.py"))
         tool_files = [f for f in tool_files if not f.name.startswith("__")]
 
         if not tool_files:
@@ -218,9 +219,9 @@ class CrewAIRAGEngine:
         Returns:
             List of similar tools
         """
-        filters = {}
+        filters = None
         if category:
-            filters["category"] = category
+            filters = {"category": category}
 
         return self.search(description, n_results, filters)
 
