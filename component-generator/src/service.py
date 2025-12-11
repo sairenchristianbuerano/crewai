@@ -1,8 +1,8 @@
 """
-FastAPI service for CrewAI Tool Generator
+FastAPI service for CrewAI Component Generator
 
-REST API service for crewAI custom tool generation.
-Endpoint prefix: /api/crewai/*
+REST API service for crewAI custom component generation.
+Endpoint prefix: /api/crewai/component-generator/*
 """
 
 import os
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     # Startup
     global generator, feasibility_checker
 
-    logger.info("Starting CrewAI Tool Generator service")
+    logger.info("Starting CrewAI Component Generator service")
 
     # Initialize generator
     rag_service_url = os.getenv("RAG_SERVICE_URL", "http://localhost:8086")
@@ -39,19 +39,19 @@ async def lifespan(app: FastAPI):
     generator = CrewAIToolGenerator(rag_service_url=rag_service_url)
     feasibility_checker = CrewAIFeasibilityChecker()
 
-    logger.info("CrewAI Tool Generator and Feasibility Checker initialized")
+    logger.info("CrewAI Component Generator and Feasibility Checker initialized")
 
     yield
 
     # Shutdown
-    logger.info("Shutting down CrewAI Tool Generator")
+    logger.info("Shutting down CrewAI Component Generator")
 
 
 # FastAPI app
 app = FastAPI(
-    title="CrewAI Tool Generator",
+    title="CrewAI Component Generator",
     version="0.1.0",
-    description="Generate custom crewAI tool components from YAML specifications",
+    description="Generate custom CrewAI components from YAML specifications",
     lifespan=lifespan
 )
 
