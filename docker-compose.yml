@@ -27,7 +27,7 @@ services:
       - component-index
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8085/api/crewai/tool-generator/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8085/api/crewai/component-generator/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -51,11 +51,13 @@ services:
       - index_data:/app/data
       # Mount existing tools from CrewAI-Studio for pattern search
       - ${CREWAI_STUDIO_TOOLS_PATH:-./component-index/data/crewai_components}:/app/data/crewai_components:ro
+      # Mount official crewAI tools for indexing
+      - C:\Users\Joana\Desktop\sairen-files\github\env\crewAI\lib\crewai-tools\src\crewai_tools\tools:/app/data/official_tools:ro
     networks:
       - crewai_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8086/api/crewai/tool-index/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8086/api/crewai/component-index/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

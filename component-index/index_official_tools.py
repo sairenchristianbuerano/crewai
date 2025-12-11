@@ -4,7 +4,7 @@ Index Official CrewAI Tools into ChromaDB
 This script indexes all 73 official crewAI tools from the official repository
 into ChromaDB for enhanced RAG pattern matching.
 
-Source: C:\Users\Joana\Desktop\sairen-files\github\env\crewAI
+Source: Official crewAI repository
 Target: component-index ChromaDB (enriching from 7 to 80+ tools)
 
 Usage:
@@ -51,7 +51,7 @@ class OfficialToolIndexer:
         self,
         official_repo_path: str,
         chroma_db_path: str = "/app/data/chroma",
-        collection_name: str = "crewai_patterns"
+        collection_name: str = "crewai_tools"
     ):
         """
         Initialize the indexer
@@ -97,8 +97,13 @@ class OfficialToolIndexer:
         """
         self.logger.info("Scanning for tool files...")
 
-        # Primary location: lib/crewai-tools/src/crewai_tools/tools/
-        tools_dir = self.official_repo_path / "lib" / "crewai-tools" / "src" / "crewai_tools" / "tools"
+        # Check if path is already the tools directory or needs navigation
+        if (self.official_repo_path / "lib" / "crewai-tools").exists():
+            # Repository root - navigate to tools directory
+            tools_dir = self.official_repo_path / "lib" / "crewai-tools" / "src" / "crewai_tools" / "tools"
+        else:
+            # Direct tools directory path
+            tools_dir = self.official_repo_path
 
         if not tools_dir.exists():
             self.logger.warning(
@@ -376,18 +381,21 @@ def main():
     print("=" * 80 + "\n")
 
     # Configuration
-    OFFICIAL_REPO_PATH = r"C:\Users\Joana\Desktop\sairen-files\github\env\crewAI"
-    CHROMA_DB_PATH = "/app/data/chroma"  # Docker path
-
     # Check if running in Docker or local
-    if not os.path.exists(CHROMA_DB_PATH):
-        # Local development - use relative path
+    if os.path.exists("/app/data/official_tools"):
+        # Running in Docker - use mounted volume
+        OFFICIAL_REPO_PATH = "/app/data/official_tools"
+        CHROMA_DB_PATH = "/app/data/chromadb"
+        print("Running in Docker environment")
+    else:
+        # Local development
+        OFFICIAL_REPO_PATH = r"C:\Users\Joana\Desktop\sairen-files\github\env\crewAI\lib\crewai-tools\src\crewai_tools\tools"
         CHROMA_DB_PATH = os.path.join(
             os.path.dirname(__file__),
             "data",
-            "chroma"
+            "chromadb"
         )
-        print(f"Running locally, using ChromaDB path: {CHROMA_DB_PATH}\n")
+        print(f"Running locally, using ChromaDB path: {CHROMA_DB_PATH}")
 
     # Create indexer
     try:

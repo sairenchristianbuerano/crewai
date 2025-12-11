@@ -86,7 +86,7 @@ app.add_middleware(
 )
 
 
-@app.get("/api/crewai/tool-index/health")
+@app.get("/api/crewai/component-index/health")
 async def health_check():
     """Health check endpoint"""
     stats = storage.get_stats() if storage else {}
@@ -101,7 +101,7 @@ async def health_check():
 
     return {
         "status": "healthy",
-        "service": "crewai-tool-index",
+        "service": "crewai-component-index",
         "version": "0.1.0",
         "stats": stats,
         "pattern_engine": pattern_stats
