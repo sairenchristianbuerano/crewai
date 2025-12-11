@@ -75,18 +75,18 @@ class GenerateRequest(BaseModel):
     spec: str
 
 
-@app.get("/api/crewai/tool-generator/health")
+@app.get("/api/crewai/component-generator/health")
 async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "crewai-tool-generator",
+        "service": "crewai-component-generator",
         "version": "0.1.0",
         "model": os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
     }
 
 
-@app.post("/api/crewai/tool-generator/generate")
+@app.post("/api/crewai/component-generator/generate")
 async def generate_tool_endpoint(request: GenerateRequest):
     """
     Generate custom crewAI tool from YAML specification
@@ -99,14 +99,7 @@ async def generate_tool_endpoint(request: GenerateRequest):
     Response:
     {
         "code": "<Generated Python code>",
-        "documentation": "<Tool usage documentation>",
-        "validation": {
-            "is_valid": true,
-            "errors": [],
-            "warnings": []
-        },
-        "dependencies": ["requests"],
-        "deployment_instructions": {...}
+        "documentation": "<Tool usage documentation>"
     }
     """
     if not generator:
@@ -130,19 +123,10 @@ async def generate_tool_endpoint(request: GenerateRequest):
             is_valid=result.validation.is_valid
         )
 
-        # Return complete response
+        # Return response in Flowise-compatible format
         return {
             "code": result.tool_code,
-            "documentation": result.documentation or "",
-            "validation": {
-                "is_valid": result.validation.is_valid,
-                "errors": result.validation.errors,
-                "warnings": result.validation.warnings,
-                "suggestions": result.validation.suggestions
-            },
-            "dependencies": result.dependencies,
-            "deployment_instructions": result.deployment_instructions,
-            "tool_config": result.tool_config
+            "documentation": result.documentation or ""
         }
 
     except yaml.YAMLError as e:
@@ -153,7 +137,7 @@ async def generate_tool_endpoint(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/crewai/tool-generator/generate/sample")
+@app.post("/api/crewai/component-generator/generate/sample")
 async def generate_sample_tool_endpoint():
     """
     Generate a sample crewAI tool using built-in specification
@@ -164,10 +148,7 @@ async def generate_sample_tool_endpoint():
     Response:
     {
         "code": "<Generated Python code>",
-        "documentation": "<Tool usage documentation>",
-        "validation": {...},
-        "dependencies": [...],
-        "deployment_instructions": {...}
+        "documentation": "<Tool usage documentation>"
     }
     """
     if not generator:
@@ -200,19 +181,10 @@ async def generate_sample_tool_endpoint():
             is_valid=result.validation.is_valid
         )
 
-        # Return complete response
+        # Return response in Flowise-compatible format
         return {
             "code": result.tool_code,
-            "documentation": result.documentation or "",
-            "validation": {
-                "is_valid": result.validation.is_valid,
-                "errors": result.validation.errors,
-                "warnings": result.validation.warnings,
-                "suggestions": result.validation.suggestions
-            },
-            "dependencies": result.dependencies,
-            "deployment_instructions": result.deployment_instructions,
-            "tool_config": result.tool_config
+            "documentation": result.documentation or ""
         }
 
     except FileNotFoundError:
@@ -226,7 +198,7 @@ async def generate_sample_tool_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/crewai/tool-generator/assess")
+@app.post("/api/crewai/component-generator/assess")
 async def assess_feasibility_endpoint(request: GenerateRequest):
     """
     Assess feasibility of generating a crewAI tool before attempting generation
