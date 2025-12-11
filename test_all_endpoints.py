@@ -321,7 +321,7 @@ class EndpointTester:
 
         try:
             response = requests.post(
-                f"{self.index_url}/api/crewai/patterns/similar",
+                f"{self.index_url}/api/crewai/component-index/patterns/similar",
                 json=payload,
                 timeout=10
             )
@@ -365,7 +365,7 @@ class TestIndexTool(BaseTool):
 
         try:
             response = requests.post(
-                f"{self.index_url}/api/crewai/patterns/index",
+                f"{self.index_url}/api/crewai/component-index/patterns/index",
                 json=tool_data,
                 timeout=10
             )
@@ -390,7 +390,7 @@ class TestIndexTool(BaseTool):
 
         try:
             response = requests.get(
-                f"{self.index_url}/api/crewai/patterns/stats",
+                f"{self.index_url}/api/crewai/component-index/patterns/stats",
                 timeout=10
             )
             passed = response.status_code == 200

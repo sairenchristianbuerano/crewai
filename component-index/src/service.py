@@ -1,8 +1,8 @@
 """
-FastAPI service for CrewAI Tool Index
+FastAPI service for CrewAI Component Index
 
-REST API service for tool registry and tracking.
-Endpoint prefix: /api/crewai/*
+REST API service for component registry and tracking.
+Endpoint prefix: /api/crewai/component-index/*
 """
 
 import os
@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     # Startup
     global storage, pattern_engine
 
-    logger.info("Starting CrewAI Tool Index service")
+    logger.info("Starting CrewAI Component Index service")
 
     # Initialize storage
     storage_path = os.getenv("STORAGE_PATH", "/app/data/components")
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     logger.info("Tool storage initialized", path=storage_path)
 
     # Initialize RAG pattern engine
-    tools_directory = os.getenv("TOOLS_DIR", "/app/data/crewai_components/tools")
+    tools_directory = os.getenv("TOOLS_DIR", "/app/data/crewai_studio_components/tools")
     chromadb_dir = os.getenv("CHROMADB_DIR", "/app/data/chromadb")
 
     try:
@@ -60,14 +60,14 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down CrewAI Tool Index")
+    logger.info("Shutting down CrewAI Component Index")
 
 
 # FastAPI app
 app = FastAPI(
-    title="CrewAI Tool Index",
+    title="CrewAI Component Index",
     version="0.1.0",
-    description="Tool registry and tracking for crewAI tools",
+    description="Component registry and tracking for CrewAI components",
     lifespan=lifespan
 )
 
@@ -108,12 +108,12 @@ async def health_check():
     }
 
 
-@app.post("/api/crewai/tools/register", response_model=ToolMetadata)
+@app.post("/api/crewai/component-index/components/register", response_model=ToolMetadata)
 async def register_tool(request: ToolRegistrationRequest):
     """
-    Register a generated tool in the index
+    Register a generated component in the index
 
-    This endpoint stores metadata about generated tools for tracking purposes.
+    This endpoint stores metadata about generated components for tracking purposes.
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -149,7 +149,7 @@ async def register_tool(request: ToolRegistrationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/tools", response_model=ToolListResponse)
+@app.get("/api/crewai/component-index/components", response_model=ToolListResponse)
 async def list_tools(
     platform: Optional[str] = Query(None, description="Filter by platform"),
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -157,7 +157,7 @@ async def list_tools(
     offset: int = Query(0, ge=0, description="Offset for pagination")
 ):
     """
-    List all registered tools with optional filters
+    List all registered components with optional filters
 
     Query parameters:
     - platform: Filter by platform (e.g., 'crewai')
@@ -189,10 +189,10 @@ async def list_tools(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/tools/stats")
+@app.get("/api/crewai/component-index/components/stats")
 async def get_stats():
     """
-    Get tool index statistics
+    Get component index statistics
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -205,10 +205,10 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/tools/name/{name}", response_model=ToolMetadata)
+@app.get("/api/crewai/component-index/components/name/{name}", response_model=ToolMetadata)
 async def get_tool_by_name(name: str):
     """
-    Get tool metadata by name (returns latest version)
+    Get component metadata by name (returns latest version)
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -227,10 +227,10 @@ async def get_tool_by_name(name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/tools/{tool_id}", response_model=ToolMetadata)
+@app.get("/api/crewai/component-index/components/{tool_id}", response_model=ToolMetadata)
 async def get_tool(tool_id: str):
     """
-    Get tool metadata by ID
+    Get component metadata by ID
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -249,13 +249,13 @@ async def get_tool(tool_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/api/crewai/tools/{tool_id}/deployment")
+@app.patch("/api/crewai/component-index/components/{tool_id}/deployment")
 async def update_deployment_status(
     tool_id: str,
     status: str = Query(..., description="Deployment status")
 ):
     """
-    Update deployment status of a tool
+    Update deployment status of a component
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -274,10 +274,10 @@ async def update_deployment_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/api/crewai/tools/{tool_id}")
+@app.delete("/api/crewai/component-index/components/{tool_id}")
 async def delete_tool(tool_id: str):
     """
-    Delete a tool from the index
+    Delete a component from the index
     """
     if not storage:
         raise HTTPException(status_code=503, detail="Storage not initialized")
@@ -320,12 +320,12 @@ class PatternIndexRequest(BaseModel):
     force_reindex: bool = False
 
 
-@app.post("/api/crewai/patterns/search")
+@app.post("/api/crewai/component-index/patterns/search")
 async def search_patterns(request: PatternSearchRequest):
     """
-    Search tool patterns using semantic search
+    Search component patterns using semantic search
 
-    This endpoint searches the knowledge base of reference tool patterns
+    This endpoint searches the knowledge base of reference component patterns
     to help guide code generation with similar examples.
     """
     if not pattern_engine:
@@ -352,12 +352,12 @@ async def search_patterns(request: PatternSearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/crewai/patterns/similar")
+@app.post("/api/crewai/component-index/patterns/similar")
 async def find_similar_patterns(request: PatternSimilarRequest):
     """
-    Find tool patterns similar to a description
+    Find component patterns similar to a description
 
-    Used by the tool generator to find reference implementations
+    Used by the component generator to find reference implementations
     that match the specification being generated.
     """
     if not pattern_engine:
@@ -382,10 +382,10 @@ async def find_similar_patterns(request: PatternSimilarRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/crewai/patterns/index")
+@app.post("/api/crewai/component-index/patterns/index")
 async def reindex_patterns(request: PatternIndexRequest):
     """
-    Reindex tool patterns from the knowledge base
+    Reindex component patterns from the knowledge base
     """
     if not pattern_engine:
         raise HTTPException(status_code=503, detail="Pattern engine not initialized")
@@ -404,7 +404,7 @@ async def reindex_patterns(request: PatternIndexRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/patterns/stats")
+@app.get("/api/crewai/component-index/patterns/stats")
 async def get_pattern_stats():
     """
     Get pattern knowledge base statistics
@@ -420,10 +420,10 @@ async def get_pattern_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/crewai/patterns/{pattern_name}")
+@app.get("/api/crewai/component-index/patterns/{pattern_name}")
 async def get_pattern_by_name(pattern_name: str):
     """
-    Get a specific tool pattern by name
+    Get a specific component pattern by name
     """
     if not pattern_engine:
         raise HTTPException(status_code=503, detail="Pattern engine not initialized")
