@@ -58,28 +58,24 @@ if (Test-Path "venv") {
 Write-Host "Creating virtual environment..."
 & python -m venv venv
 
-Write-Host "Activating virtual environment..."
-& .\venv\Scripts\Activate.ps1
-
 Write-Host "Upgrading pip..."
 try {
-    & pip install --upgrade pip --quiet
+    & .\venv\Scripts\python.exe -m pip install --upgrade pip --quiet
 } catch {
     Write-Host "⚠ Pip upgrade skipped" -ForegroundColor Yellow
 }
 
 Write-Host "Installing dependencies from requirements.txt..."
-& pip install -r requirements.txt
+& .\venv\Scripts\pip.exe install -r requirements.txt
 
 # Pre-download sentence transformer model
 Write-Host "Pre-downloading sentence transformer model (this may take a minute)..."
 try {
-    & python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+    & .\venv\Scripts\python.exe -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 } catch {
     Write-Host "⚠ Model download skipped" -ForegroundColor Yellow
 }
 
-deactivate
 Write-Host "✓ Component Index setup complete" -ForegroundColor Green
 Write-Host ""
 
@@ -101,20 +97,16 @@ if (Test-Path "venv") {
 Write-Host "Creating virtual environment..."
 & python -m venv venv
 
-Write-Host "Activating virtual environment..."
-& .\venv\Scripts\Activate.ps1
-
 Write-Host "Upgrading pip..."
 try {
-    & pip install --upgrade pip --quiet
+    & .\venv\Scripts\python.exe -m pip install --upgrade pip --quiet
 } catch {
     Write-Host "⚠ Pip upgrade skipped" -ForegroundColor Yellow
 }
 
 Write-Host "Installing dependencies from requirements.txt..."
-& pip install -r requirements.txt
+& .\venv\Scripts\pip.exe install -r requirements.txt
 
-deactivate
 Write-Host "✓ Component Generator setup complete" -ForegroundColor Green
 Write-Host ""
 
