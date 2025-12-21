@@ -396,3 +396,5 @@ tools_export_*.json
 # ============================================
 # Add your custom patterns below:
 
+crewai-tool-web-scraper/
+crewai-tool-*/
