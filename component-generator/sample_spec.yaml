@@ -10,27 +10,17 @@ inputs:
   - name: "input_expression"
     type: "str"
     display_name: "Math Expression"
-    info: "Mathematical expression to evaluate (e.g., '2 + 2', 'sin(45)', 'sqrt(16)')"
+    description: "Mathematical expression to evaluate with operations"
     required: true
-    default: ""
+    examples: ["2 + 2", "sin(45)", "sqrt(16)", "1+2-3*4/5"]
 
   - name: "math_function"
-    type: "str"
+    type: "Optional[str]"
     display_name: "Math Function"
-    info: "Optional specific math function to apply (add, subtract, multiply, divide, power, sin, cos, tan, etc.)"
+    description: "Optional specific math function to apply"
     required: false
-    default: "default"
-    constraints:
-      - "default"
-      - "add"
-      - "subtract"
-      - "multiply"
-      - "divide"
-      - "power"
-      - "sin"
-      - "cos"
-      - "tan"
-      - "sqrt"
+    default_value: None
+    examples: ["sin", "cos", "tan", "sqrt", "log"]
 
 outputs:
   - name: "result"

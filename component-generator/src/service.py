@@ -17,19 +17,21 @@ from pydantic import BaseModel
 from crewai_agent import CrewAIToolGenerator
 from crewai_validator import CrewAIFeasibilityChecker
 from base_classes import ToolSpec, GeneratedTool
+from documentation_generator import DocumentationGenerator
 
 logger = structlog.get_logger()
 
 # Generator instances
 generator: Optional[CrewAIToolGenerator] = None
 feasibility_checker: Optional[CrewAIFeasibilityChecker] = None
+doc_generator: Optional[DocumentationGenerator] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown"""
     # Startup
-    global generator, feasibility_checker
+    global generator, feasibility_checker, doc_generator
 
     logger.info("Starting CrewAI Component Generator service")
 
@@ -38,8 +40,9 @@ async def lifespan(app: FastAPI):
 
     generator = CrewAIToolGenerator(rag_service_url=rag_service_url)
     feasibility_checker = CrewAIFeasibilityChecker()
+    doc_generator = DocumentationGenerator()
 
-    logger.info("CrewAI Component Generator and Feasibility Checker initialized")
+    logger.info("CrewAI Component Generator, Feasibility Checker, and Documentation Generator initialized")
 
     yield
 
@@ -123,10 +126,19 @@ async def generate_tool_endpoint(request: GenerateRequest):
             is_valid=result.validation.is_valid
         )
 
+        # Generate comprehensive documentation with CrewAI Studio guide
+        full_documentation = ""
+        if doc_generator:
+            documentation_obj = doc_generator.generate(spec, result.tool_code)
+            full_documentation = doc_generator.to_markdown(documentation_obj)
+            logger.info("Comprehensive documentation generated", doc_size=len(full_documentation))
+        else:
+            full_documentation = result.documentation or ""
+
         # Return response in Flowise-compatible format
         return {
             "code": result.tool_code,
-            "documentation": result.documentation or ""
+            "documentation": full_documentation
         }
 
     except yaml.YAMLError as e:
@@ -181,10 +193,19 @@ async def generate_sample_tool_endpoint():
             is_valid=result.validation.is_valid
         )
 
+        # Generate comprehensive documentation with CrewAI Studio guide
+        full_documentation = ""
+        if doc_generator:
+            documentation_obj = doc_generator.generate(spec, result.tool_code)
+            full_documentation = doc_generator.to_markdown(documentation_obj)
+            logger.info("Comprehensive documentation generated", doc_size=len(full_documentation))
+        else:
+            full_documentation = result.documentation or ""
+
         # Return response in Flowise-compatible format
         return {
             "code": result.tool_code,
-            "documentation": result.documentation or ""
+            "documentation": full_documentation
         }
 
     except FileNotFoundError:

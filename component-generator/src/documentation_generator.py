@@ -60,6 +60,7 @@ class Documentation:
         api_reference: API documentation
         parameters_doc: Parameter documentation
         best_practices: Best practices list
+        crewai_studio_guide: CrewAI Studio complete setup guide with LLM configuration
         troubleshooting: Common issues and solutions
     """
     tool_name: str
@@ -70,6 +71,7 @@ class Documentation:
     api_reference: str
     parameters_doc: str
     best_practices: List[str]
+    crewai_studio_guide: str
     troubleshooting: List[Dict[str, str]]
 
 
@@ -114,6 +116,7 @@ class DocumentationGenerator:
         api_reference = self._generate_api_reference(spec)
         parameters_doc = self._generate_parameters_documentation(spec)
         best_practices = self._generate_best_practices(spec)
+        crewai_studio_guide = self._generate_crewai_studio_guide(spec)
         troubleshooting = self._generate_troubleshooting(spec)
 
         doc = Documentation(
@@ -125,6 +128,7 @@ class DocumentationGenerator:
             api_reference=api_reference,
             parameters_doc=parameters_doc,
             best_practices=best_practices,
+            crewai_studio_guide=crewai_studio_guide,
             troubleshooting=troubleshooting
         )
 
@@ -536,6 +540,264 @@ class DocumentationGenerator:
 
         return practices
 
+    def _generate_crewai_studio_guide(self, spec: ToolSpec) -> str:
+        """Generate comprehensive CrewAI Studio setup guide"""
+        tool_name = spec.display_name or spec.name
+
+        # Get first runtime parameter for example
+        runtime_params = spec.get_normalized_inputs()
+        example_param = runtime_params[0] if runtime_params else None
+        example_input = ""
+        if example_param and example_param.examples:
+            example_input = example_param.examples[0]
+        elif example_param:
+            example_input = "your_input_here"
+
+        guide = f"""## CrewAI Studio Setup Guide
+
+### Recommended LLM Configuration
+
+**For Local Development (Recommended):**
+- **LLM Provider:** Ollama
+- **Model:** llama3.2 (default)
+- **Alternative Models:** llama3.1, mistral, codellama, or any Ollama-compatible model
+
+**Why Ollama 3.2?**
+- Free and runs locally (no API costs)
+- Good balance of performance and resource usage
+- Works well with tool-calling patterns
+- Privacy-friendly (data stays on your machine)
+
+**Other Supported LLMs:**
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic Claude
+- Google Gemini
+- Any OpenAI-compatible API
+
+### Step-by-Step Setup for {tool_name}
+
+#### 1. Create Your Crew
+
+In CrewAI Studio:
+1. Click "New Crew"
+2. Name it: "{tool_name} Crew"
+3. Save
+
+#### 2. Configure the Agent
+
+Go to the **Agents** page and create a new agent with these **EXACT** settings:
+
+**Basic Settings:**
+- **Role:** {tool_name} Expert
+- **Goal:** Use the {tool_name} tool and return only the result
+- **Backstory:** You are a specialist that uses the {tool_name} tool and returns direct results
+
+**CRITICAL Agent Settings (These prevent LLM confusion):**
+
+✅ **Max Iterations:** `1`
+   - Forces the agent to respond immediately
+   - Prevents infinite loops
+
+❌ **Allow Delegation:** UNCHECKED
+   - Prevents the agent from trying to delegate to other agents
+   - Forces it to use the tool directly
+
+✅ **Temperature:** `0` or `0.1`
+   - Makes responses deterministic
+   - Reduces hallucinations
+   - Ensures consistent tool usage
+
+❌ **Memory:** UNCHECKED (if available)
+   - Prevents context pollution
+   - Avoids confusion from previous runs
+
+❌ **Verbose:** UNCHECKED
+   - Cleaner output
+   - Faster execution
+
+#### 3. Add the Tool
+
+1. Go to **Tools** page
+2. Click "Add Custom Tool"
+3. Paste the {tool_name} code
+4. Save the tool
+5. Assign it to your "{tool_name} Expert" agent
+
+#### 4. Create the Task
+
+Go to **Tasks** page and create a task:
+
+**Task Settings:**
+- **Description:** Use the {tool_name} tool with input "{example_input}" and return the result
+- **Expected Output:** The direct result from the tool
+- **Agent:** {tool_name} Expert
+
+**Task Description Template:**
+```
+Use the {tool_name} with [describe inputs] and return only the result.
+```
+
+**DON'T use complex instructions like:**
+❌ "Calculate X. Use the tool ONCE, then immediately provide the final answer"
+❌ "First do X, then Y, then provide output"
+
+**DO use simple, direct instructions:**
+✅ "Use the {tool_name} with input 'X' and return the result"
+
+#### 5. Quick Test Configuration
+
+**Agent Checklist:**
+- ✅ Max Iterations: 1
+- ❌ Allow Delegation: OFF
+- ✅ Temperature: 0-0.1
+- ❌ Memory: OFF
+- ❌ Verbose: OFF
+
+**Task Checklist:**
+- ✅ Simple, direct description
+- ✅ Clear expected output
+- ✅ Assigned to correct agent
+
+#### 6. Configure Crew Settings
+
+Go to **Crew Settings** and configure these **RECOMMENDED** settings:
+
+**Process:**
+- Select: **Sequential** (Recommended for beginners)
+- Sequential executes tasks in order, one after another
+- Hierarchical requires a manager agent (more complex)
+
+**Crew-Level Settings:**
+
+❌ **Verbose:** UNCHECKED
+   - Reduces noise in output
+   - Shows only essential information
+   - Recommended: OFF for cleaner results
+
+❌ **Memory:** UNCHECKED
+   - Prevents crew from remembering past executions
+   - Avoids context pollution between runs
+   - Recommended: OFF for consistent behavior
+
+❌ **Cache:** UNCHECKED
+   - Disables result caching
+   - Ensures fresh results every time
+   - Recommended: OFF for tool testing
+
+❌ **Planning:** UNCHECKED
+   - Disables automatic planning mode
+   - Not needed for simple tool usage
+   - Recommended: OFF for direct execution
+
+**Rate Limiting:**
+- **Max RPM (Requests Per Minute):** 10
+  - Prevents overwhelming APIs
+  - Adjust based on your LLM provider limits
+  - Ollama: Can handle higher (20-30)
+  - OpenAI free tier: Keep at 3-5
+  - OpenAI paid: Can use 60+
+
+**Add Tasks to Crew:**
+1. In Crew settings, find "Tasks" section
+2. Add the task you created in Step 4
+3. Tasks will execute in the order you add them
+4. For this simple example, you only need 1 task
+
+**Crew Configuration Summary:**
+```yaml
+process: sequential
+verbose: false
+memory: false
+cache: false
+planning: false
+max_rpm: 10
+tasks:
+  - your_calculator_task
+```
+
+#### 7. Run Your Crew
+
+1. Click "Run Crew"
+2. Monitor the output
+3. The agent should use the tool immediately and return results
+4. Verify the result matches your expected output
+
+**What to Expect:**
+- Agent receives the task
+- Agent calls the {tool_name} tool with your input
+- Tool executes and returns result
+- Agent returns the result as final output
+
+### Troubleshooting LLM Issues
+
+**Problem:** Agent doesn't use the tool
+**Solution:**
+- Ensure "Allow Delegation" is UNCHECKED
+- Set Max Iterations to 1
+- Simplify task description
+
+**Problem:** Agent hallucinates or gives wrong answers
+**Solution:**
+- Set Temperature to 0
+- Disable Memory
+- Make task description more specific
+
+**Problem:** Agent loops infinitely
+**Solution:**
+- Set Max Iterations to 1
+- Check that the tool returns a string (not dict/object)
+
+**Problem:** "Tool not found" error
+**Solution:**
+- Verify tool is assigned to the agent
+- Check tool name matches exactly
+- Restart CrewAI Studio
+
+### Example Working Configuration
+
+**Agent:**
+```yaml
+role: Calculator Expert
+goal: Return only numerical results using the calculator tool
+backstory: You use the Playground Calculator tool and return only numbers
+max_iterations: 1
+allow_delegation: false
+temperature: 0
+```
+
+**Task:**
+```yaml
+description: Use the Playground Calculator with input "2+2*3" and return only the number
+expected_output: 8
+agent: Calculator Expert
+```
+
+**Crew:**
+```yaml
+process: sequential
+verbose: false
+memory: false
+cache: false
+planning: false
+max_rpm: 10
+tasks:
+  - calculator_task
+```
+
+**Result:** The agent immediately uses the tool and returns `8`.
+
+### Tips for Success
+
+1. **Start Simple:** Test with basic inputs first
+2. **One Tool Per Agent:** Don't overload agents with multiple tools initially
+3. **Clear Instructions:** Be explicit about what you want
+4. **Monitor Iterations:** If it takes >1 iteration, something's wrong
+5. **Temperature Matters:** 0 = deterministic, 1 = creative (use 0 for tools)
+
+---
+"""
+        return guide
+
     def _generate_troubleshooting(self, spec: ToolSpec) -> List[Dict[str, str]]:
         """Generate troubleshooting guide"""
         issues = []
@@ -692,6 +954,9 @@ class DocumentationGenerator:
         for practice in doc.best_practices:
             lines.append(f"- {practice}")
         lines.append("")
+
+        # CrewAI Studio Guide
+        lines.append(doc.crewai_studio_guide)
 
         # Troubleshooting
         lines.append("## Troubleshooting")
