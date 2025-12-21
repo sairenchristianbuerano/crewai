@@ -39,9 +39,9 @@ class CrewAIToolValidator:
     }
 
     # Required methods
+    # Note: Only _run is required. BaseTool provides run() method automatically.
     REQUIRED_METHODS = {
         '_run',
-        'run',
     }
 
     def __init__(self):

@@ -5,6 +5,7 @@ CrewAI Tool Generator using Claude AI
 import os
 import json
 import yaml
+import re
 from typing import Optional, Dict, Any
 import structlog
 from anthropic import Anthropic
@@ -18,6 +19,7 @@ from base_classes import (
 from crewai_validator import CrewAIToolValidator
 from dependency_validator import DependencyValidator, get_validation_summary
 from pattern_matcher import PatternMatcher, get_pattern_report
+from test_generator import TestFileGenerator
 
 logger = structlog.get_logger()
 
@@ -53,6 +55,7 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         self.validator = CrewAIToolValidator()
         self.dependency_validator = DependencyValidator()
         self.pattern_matcher = PatternMatcher()
+        self.test_generator = TestFileGenerator()
         self.logger = logger.bind(component="crewai_generator")
 
         # Load manual implementation templates
@@ -300,6 +303,9 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         # 6. Save complete JSON response to file (like Flowise)
         self._save_generation_response_to_json(spec.name, generated_tool)
 
+        # 7. Generate and save test file for the tool
+        self._generate_test_file(spec, generated_code)
+
         return generated_tool
 
     async def _retrieve_similar_components(self, spec: ToolSpec) -> Dict[str, Any]:
@@ -403,15 +409,26 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         for req in spec.requirements:
             prompt += f"- {req}\n"
 
-        prompt += "\n## Input Parameters\n"
-        for inp in spec.inputs:
-            required = "required" if inp.get('required', False) else "optional"
-            prompt += f"- **{inp['name']}** ({inp.get('type', 'str')}, {required}): {inp.get('description', '')}\n"
+        # Use normalized parameter objects for enhanced type support
+        runtime_params = spec.get_normalized_inputs()
+        config_params = spec.get_normalized_config_params()
 
-        if spec.config_params:
-            prompt += "\n## Configuration Parameters (for __init__)\n"
-            for param in spec.config_params:
-                prompt += f"- **{param['name']}** ({param.get('type', 'str')}): {param.get('description', '')}\n"
+        if runtime_params:
+            prompt += "\n## Input Parameters (Runtime - for _run method)\n"
+            for param in runtime_params:
+                required = "**required**" if param.required else "*optional*"
+                default_info = f" (default: {param.default_value})" if param.default_value is not None else ""
+                prompt += f"- **{param.name}** (`{param.type}`, {required}){default_info}: {param.description}\n"
+                if param.examples:
+                    prompt += f"  - Examples: {', '.join(str(e) for e in param.examples)}\n"
+
+        if config_params:
+            prompt += "\n## Configuration Parameters (Config - for __init__ method)\n"
+            for param in config_params:
+                default_info = f" (default: {param.default_value})" if param.default_value is not None else ""
+                prompt += f"- **{param.name}** (`{param.type}`){default_info}: {param.description}\n"
+                if param.examples:
+                    prompt += f"  - Examples: {', '.join(str(e) for e in param.examples)}\n"
 
         # Add dependency validation information
         if spec.dependencies:
@@ -486,28 +503,42 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             for error in previous_errors:
                 prompt += f"- {error}\n"
 
-        prompt += """
+        # Generate proper typing imports based on actual parameter types
+        typing_imports = spec.get_all_type_imports()
+        if not typing_imports:
+            typing_imports = ['Optional', 'Dict', 'Any']  # Defaults
+
+        # Always include Type for args_schema
+        if 'Type' not in typing_imports:
+            typing_imports.append('Type')
+
+        typing_imports_str = ', '.join(sorted(typing_imports))
+
+        prompt += f"""
 
 # Code Generation Instructions
 
 Generate a complete crewAI tool following this **exact structure**:
 
 ```python
-from typing import Optional, Dict, Any, Type
+from typing import {typing_imports_str}
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 # 1. Input Schema (if tool has parameters)
-class {ToolName}InputSchema(BaseModel):
-    \"\"\"Input schema for {ToolName}\"\"\"
-    param1: str = Field(..., description="Parameter description")
-    param2: Optional[int] = Field(None, description="Optional parameter")
+class {{ToolName}}InputSchema(BaseModel):
+    \"\"\"Input schema for {{ToolName}}\"\"\"
+    # Use exact Field definitions from parameter specs
+    # Example: param_name: str = Field(..., description="Description here")
+    # Example with optional: param_name: Optional[int] = Field(None, description="Optional param")
+    # Example with List: items: List[str] = Field(..., description="List of items")
+    # Example with Dict: config: Dict[str, Any] = Field(..., description="Configuration dict")
 
 # 2. Main Tool Class
-class {ToolName}(BaseTool):
-    name: str = "{display_name}"
-    description: str = "{description}"
-    args_schema: Type[BaseModel] = {ToolName}InputSchema
+class {{ToolName}}(BaseTool):
+    name: str = "{{display_name}}"
+    description: str = "{{description}}"
+    args_schema: Type[BaseModel] = {{ToolName}}InputSchema
 
     # Configuration parameters (if needed)
     config_param: Optional[str] = None
@@ -515,7 +546,6 @@ class {ToolName}(BaseTool):
     def __init__(self, config_param: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.config_param = config_param
-        self._generate_description()
 
     def _run(self, param1: str, param2: Optional[int] = None) -> Any:
         \"\"\"
@@ -533,27 +563,21 @@ class {ToolName}(BaseTool):
             result = None  # Your logic
             return result
         except Exception as e:
-            return {"error": str(e)}
-
-    def run(self, input_data: {ToolName}InputSchema) -> Any:
-        \"\"\"Run the tool with validated input\"\"\"
-        return self._run(
-            param1=input_data.param1,
-            param2=input_data.param2
-        )
+            return {{"error": str(e)}}
 ```
 
-# Important Requirements
+# Important Requirements - FOLLOW OFFICIAL CrewAI TEMPLATE
 
 1. **Use the EXACT class name from spec:** `{spec.name}`
 2. **Include proper type hints** (from typing module)
 3. **Create InputSchema** if tool has parameters
-4. **Implement both _run() and run() methods**
-5. **Add comprehensive docstrings**
-6. **Include error handling** in _run()
-7. **Return structured data** (dict or string)
-8. **Follow crewAI BaseTool interface**
-9. **Add `self._generate_description()` in __init__** if parameters are configurable
+4. **Implement ONLY the _run() method** - BaseTool handles run()
+5. **DO NOT add a run() method** - This breaks compatibility
+6. **DO NOT call _generate_description()** - BaseTool handles this
+7. **Add comprehensive docstrings**
+8. **Include error handling** in _run()
+9. **Return structured data** (dict or string)
+10. **Follow official CrewAI BaseTool template exactly**
 
 # Code Quality
 
@@ -709,14 +733,23 @@ print(result)
             tool_class=spec.name
         )
 
-        for inp in spec.inputs:
-            required = "**Required**" if inp.get('required', False) else "*Optional*"
-            doc += f"- **{inp['name']}** ({inp.get('type', 'str')}) - {required}: {inp.get('description', '')}\n"
+        # Use normalized parameters for documentation
+        runtime_params = spec.get_normalized_inputs()
+        for param in runtime_params:
+            required = "**Required**" if param.required else "*Optional*"
+            default_str = f" (default: `{param.default_value}`)" if param.default_value is not None else ""
+            doc += f"- **{param.name}** (`{param.type}`) - {required}{default_str}: {param.description}\n"
+            if param.examples:
+                doc += f"  - Examples: {', '.join(f'`{e}`' for e in param.examples)}\n"
 
-        if spec.config_params:
+        config_params = spec.get_normalized_config_params()
+        if config_params:
             doc += "\n## Configuration\n\n"
-            for param in spec.config_params:
-                doc += f"- **{param['name']}** ({param.get('type', 'str')}): {param.get('description', '')}\n"
+            for param in config_params:
+                default_str = f" (default: `{param.default_value}`)" if param.default_value is not None else ""
+                doc += f"- **{param.name}** (`{param.type}`){default_str}: {param.description}\n"
+                if param.examples:
+                    doc += f"  - Examples: {', '.join(f'`{e}`' for e in param.examples)}\n"
 
         doc += """
 ## Requirements
@@ -727,12 +760,19 @@ print(result)
 
         return doc
 
+    def _to_snake_case(self, name: str) -> str:
+        """Convert PascalCase/camelCase to snake_case"""
+        import re
+        # Insert underscore before capital letters (except first) and convert to lowercase
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
     def _save_generated_tool_to_file(self, tool_name: str, code: str):
         """
         Save generated tool code to local file for testing and reference
 
         Args:
-            tool_name: Name of the tool
+            tool_name: Name of the tool (PascalCase)
             code: Generated Python code
         """
         try:
@@ -740,8 +780,9 @@ print(result)
             output_dir = os.path.join("/app/data", "generated_tools")
             os.makedirs(output_dir, exist_ok=True)
 
-            # Generate filename
-            filename = f"{tool_name}.py"
+            # Generate filename using snake_case (official Python/CrewAI convention)
+            snake_case_name = self._to_snake_case(tool_name)
+            filename = f"{snake_case_name}.py"
             filepath = os.path.join(output_dir, filename)
 
             # Write code to file
@@ -751,14 +792,86 @@ print(result)
             self.logger.info(
                 "Generated tool saved to file",
                 tool_name=tool_name,
+                filename=filename,
                 filepath=filepath,
                 file_size=len(code)
             )
+
+            # Update __init__.py to export this tool
+            self._update_tools_init_file(output_dir, tool_name, snake_case_name)
 
         except Exception as e:
             self.logger.warning(
                 "Failed to save generated tool to file",
                 tool_name=tool_name,
+                error=str(e)
+            )
+
+    def _update_tools_init_file(self, output_dir: str, class_name: str, module_name: str):
+        """
+        Update or create __init__.py in the tools directory to export generated tools
+
+        Args:
+            output_dir: Directory containing the generated tools
+            class_name: Tool class name (PascalCase)
+            module_name: Module filename without .py (snake_case)
+        """
+        try:
+            init_file_path = os.path.join(output_dir, "__init__.py")
+
+            # Read existing __init__.py or create new content
+            existing_imports = []
+            existing_exports = []
+
+            if os.path.exists(init_file_path):
+                with open(init_file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                    # Parse existing imports
+                    import_pattern = r'from \.(\w+) import (\w+)'
+                    existing_imports = re.findall(import_pattern, content)
+
+                    # Parse existing exports
+                    all_pattern = r'__all__\s*=\s*\[(.*?)\]'
+                    all_match = re.search(all_pattern, content, re.DOTALL)
+                    if all_match:
+                        exports_str = all_match.group(1)
+                        existing_exports = [e.strip(' "\',\n') for e in exports_str.split(',') if e.strip()]
+
+            # Add new tool if not already present
+            new_import = (module_name, class_name)
+            if new_import not in existing_imports:
+                existing_imports.append(new_import)
+
+            if class_name not in existing_exports:
+                existing_exports.append(class_name)
+
+            # Generate new __init__.py content
+            init_content = "# Auto-generated file - exports all generated CrewAI tools\n\n"
+
+            # Add imports
+            for module, class_name_entry in sorted(existing_imports):
+                init_content += f"from .{module} import {class_name_entry}\n"
+
+            # Add __all__
+            init_content += "\n__all__ = [\n"
+            for export in sorted(existing_exports):
+                init_content += f'    "{export}",\n'
+            init_content += "]\n"
+
+            # Write updated __init__.py
+            with open(init_file_path, 'w', encoding='utf-8') as f:
+                f.write(init_content)
+
+            self.logger.info(
+                "__init__.py updated",
+                path=init_file_path,
+                exported_tools=len(existing_exports)
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to update __init__.py",
                 error=str(e)
             )
 
@@ -817,3 +930,53 @@ print(result)
                 tool_name=tool_name,
                 error=str(e)
             )
+
+    def _generate_test_file(self, spec: ToolSpec, tool_code: str):
+        """
+        Generate and save test file for the generated tool
+
+        Args:
+            spec: The ToolSpec used to generate the tool
+            tool_code: The generated tool code
+        """
+        try:
+            # Generate test content
+            test_content = self.test_generator.generate_test_file(spec, tool_code)
+
+            # Create tests directory
+            output_dir = os.path.join("/app/data", "generated_tools", "tests")
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Create __init__.py in tests directory if it doesn't exist
+            init_file = os.path.join(output_dir, "__init__.py")
+            if not os.path.exists(init_file):
+                with open(init_file, 'w', encoding='utf-8') as f:
+                    f.write('"""Auto-generated tests for CrewAI tools"""\n')
+
+            # Save test file with test_ prefix
+            snake_case_name = self._to_snake_case(spec.name)
+            test_filename = f"test_{snake_case_name}.py"
+            test_filepath = os.path.join(output_dir, test_filename)
+
+            with open(test_filepath, 'w', encoding='utf-8') as f:
+                f.write(test_content)
+
+            self.logger.info(
+                "Test file generated successfully",
+                tool_name=spec.name,
+                test_file=test_filename,
+                filepath=test_filepath,
+                file_size=len(test_content)
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to generate test file",
+                tool_name=spec.name,
+                error=str(e)
+            )
+
+    def _to_snake_case(self, name: str) -> str:
+        """Convert PascalCase to snake_case"""
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
