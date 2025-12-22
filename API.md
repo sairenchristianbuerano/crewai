@@ -38,7 +38,7 @@
 Check the health and status of the Component Generator service.
 
 ```http
-GET /api/crewai/tool-generator/health
+GET /api/crewai/component-generator/health
 ```
 
 **Response 200:**
@@ -58,7 +58,7 @@ GET /api/crewai/tool-generator/health
 Generate a crewAI BaseTool component from a YAML specification.
 
 ```http
-POST /api/crewai/tool-generator/generate
+POST /api/crewai/component-generator/generate
 Content-Type: application/json
 ```
 
@@ -111,26 +111,7 @@ version: "1.0.0"
 ```json
 {
   "code": "from typing import Optional, Dict, Any, Type\nfrom crewai.tools import BaseTool\n...",
-  "documentation": "# CustomApiTool\n\nVersion: 1.0.0\n...",
-  "validation": {
-    "is_valid": true,
-    "errors": [],
-    "warnings": [],
-    "suggestions": []
-  },
-  "dependencies": ["requests"],
-  "deployment_instructions": {
-    "usage": "from generated_tools.customapitool import CustomApiTool",
-    "dependencies": ["requests"],
-    "install_command": "pip install requests"
-  },
-  "tool_config": {
-    "name": "CustomApiTool",
-    "display_name": "API Caller",
-    "category": "api",
-    "version": "1.0.0",
-    "author": "Your Name"
-  }
+  "documentation": "# CustomApiTool\n\n**Version:** 1.0.0\n**Author:** Your Name\n**Category:** api\n\n## Overview\n\n...\n\n## CrewAI Studio Setup Guide\n\n### Recommended LLM Configuration\n\n**For Local Development (Recommended):**\n- **LLM Provider:** Ollama\n- **Model:** llama3.2 (default)\n...\n\n### Step-by-Step Setup\n\n#### 1. Create Your Crew\n...\n\n#### 2. Configure the Agent\n- **Role:** ...\n- **Goal:** ...\n- **Backstory:** ...\n- **Temperature:** 0\n- **Max Iterations:** 1\n- **Allow Delegation:** OFF\n...\n\n#### 3. Add the Tool\n...\n\n#### 4. Create the Task\n- **Description:** ...\n- **Expected Output:** ...\n...\n\n#### 5. Configure Crew Settings\n- **Process:** Sequential\n- **Verbose:** OFF\n- **Memory:** OFF\n- **Cache:** OFF\n- **Planning:** OFF\n- **Max RPM:** 10\n..."
 }
 ```
 
@@ -138,16 +119,15 @@ version: "1.0.0"
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `code` | string | Generated Python code for the tool |
-| `documentation` | string | Markdown documentation for usage |
-| `validation` | object | Validation results |
-| `validation.is_valid` | boolean | Whether code passed validation |
-| `validation.errors` | array | List of validation errors |
-| `validation.warnings` | array | List of warnings |
-| `validation.suggestions` | array | Improvement suggestions |
-| `dependencies` | array | Required Python packages |
-| `deployment_instructions` | object | How to deploy the tool |
-| `tool_config` | object | Tool metadata |
+| `code` | string | Generated Python code for the CrewAI BaseTool. Includes automatic handling for optional parameters from JSON serialization (e.g., "None" strings). |
+| `documentation` | string | Comprehensive Markdown documentation including: installation instructions, usage examples, API reference, CrewAI Studio setup guide with all configuration settings (Agent, Task, Crew), troubleshooting, and best practices. |
+
+**Key Features of Generated Tools:**
+
+- ✅ **CrewAI Studio Compatible:** Handles optional parameters sent as `"None"` or `"null"` strings from JSON
+- ✅ **Complete Setup Guide:** Documentation includes step-by-step CrewAI Studio configuration for Agent (Role, Goal, Backstory, Temperature, Max Iterations, Delegation), Task (Description, Expected Output), and Crew (Process, Verbose, Memory, Cache, Planning, Max RPM)
+- ✅ **Production-Ready:** AST-based evaluation for security (when applicable), comprehensive error handling, type hints
+- ✅ **Ollama 3.2 Default:** Documentation recommends Ollama 3.2 as default LLM for local development
 
 **Error Responses:**
 
@@ -179,7 +159,7 @@ version: "1.0.0"
 Generate a sample crewAI tool using a built-in specification file.
 
 ```http
-POST /api/crewai/tool-generator/generate/sample
+POST /api/crewai/component-generator/generate/sample
 Content-Type: application/json
 ```
 
@@ -190,38 +170,19 @@ This endpoint demonstrates the tool generation capabilities by generating a samp
 
 **Example Request:**
 ```bash
-curl -X POST http://localhost:8085/api/crewai/tool-generator/generate/sample \
+curl -X POST http://localhost:8085/api/crewai/component-generator/generate/sample \
   -H "Content-Type: application/json"
 ```
 
 **Response 200:**
 ```json
 {
-  "code": "from typing import Optional, Dict, Any, Type\nfrom crewai.tools import BaseTool\n...",
-  "documentation": "# PlaygroundCalculator\n\nVersion: 1.0.0\n...",
-  "validation": {
-    "is_valid": true,
-    "errors": [],
-    "warnings": [],
-    "suggestions": []
-  },
-  "dependencies": ["math", "numpy"],
-  "deployment_instructions": {
-    "usage": "from generated_tools.playgroundcalculator import PlaygroundCalculator",
-    "dependencies": ["math", "numpy"],
-    "install_command": "pip install numpy"
-  },
-  "tool_config": {
-    "name": "PlaygroundCalculator",
-    "display_name": "Playground Calculator",
-    "category": "tools",
-    "version": "1.0.0",
-    "author": "CrewAI Component Factory"
-  }
+  "code": "from typing import Optional, Type, Dict, Any, Union\nfrom crewai.tools import BaseTool\nfrom pydantic import BaseModel, Field\nimport math\nimport ast\nimport operator\n\nclass PlaygroundCalculatorInputSchema(BaseModel):\n    \"\"\"Input schema for PlaygroundCalculator\"\"\"\n    input_expression: str = Field(..., description=\"Mathematical expression to evaluate with operations\")\n    math_function: Optional[str] = Field(None, description=\"Optional specific math function to apply\")\n\nclass PlaygroundCalculator(BaseTool):\n    name: str = \"Playground Calculator\"\n    description: str = \"A flexible mathematical calculator tool that allows performing various mathematical operations based on input arguments\"\n    args_schema: Type[BaseModel] = PlaygroundCalculatorInputSchema\n\n    def _run(self, input_expression: str, math_function: Optional[str] = None) -> Dict[str, Any]:\n        try:\n            # Handle string \"None\" or \"null\" from JSON serialization\n            if math_function and math_function.lower() not in ['none', 'null']:\n                # Apply specific math function\n                ...\n            else:\n                # Evaluate expression directly\n                ...\n        except Exception as e:\n            return {\"error\": str(e)}\n...",
+  "documentation": "# Playground Calculator\n\n**Category:** tools\n**Version:** 1.0.0\n**Author:** Component Factory\n\n## Overview\n\nA flexible mathematical calculator tool that allows performing various mathematical operations based on input arguments\n\n## CrewAI Studio Setup Guide\n\n### Recommended LLM Configuration\n\n**For Local Development (Recommended):**\n- **LLM Provider:** Ollama\n- **Model:** llama3.2 (default)\n..."
 }
 ```
 
-**Response Fields:** Same as `/generate` endpoint
+**Response Fields:** Same as `/generate` endpoint (code and documentation only)
 
 **Error Responses:**
 
@@ -252,7 +213,7 @@ curl -X POST http://localhost:8085/api/crewai/tool-generator/generate/sample \
 Assess the feasibility of generating a tool before attempting full generation.
 
 ```http
-POST /api/crewai/tool-generator/assess
+POST /api/crewai/component-generator/assess
 Content-Type: application/json
 ```
 
@@ -301,7 +262,7 @@ Content-Type: application/json
 Check the health and status of the Component Index service.
 
 ```http
-GET /api/crewai/tool-index/health
+GET /api/crewai/component-index/health
 ```
 
 **Response 200:**
@@ -800,14 +761,14 @@ Currently, no rate limits are enforced. For production use, consider implementin
 
 **Step 1: Assess Feasibility**
 ```bash
-curl -X POST http://localhost:8085/api/crewai/tool-generator/assess \
+curl -X POST http://localhost:8085/api/crewai/component-generator/assess \
   -H "Content-Type: application/json" \
   -d '{"spec": "name: MyTool\ndescription: Test tool\ncategory: custom"}'
 ```
 
 **Step 2: Generate Tool**
 ```bash
-curl -X POST http://localhost:8085/api/crewai/tool-generator/generate \
+curl -X POST http://localhost:8085/api/crewai/component-generator/generate \
   -H "Content-Type: application/json" \
   -d "{\"spec\": \"$(cat my_tool_spec.yaml)\"}" > generated_tool.json
 ```
@@ -926,6 +887,6 @@ Future versions will use explicit versioning:
 
 ---
 
-**Last Updated:** 2025-12-10
+**Last Updated:** 2025-12-22
 **API Version:** 1.0.0
 **Services:** Component Generator v0.1.0, Component Index v0.1.0
