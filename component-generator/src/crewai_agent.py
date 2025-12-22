@@ -32,7 +32,7 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         api_key: Optional[str] = None,
         model: str = "claude-sonnet-4-20250514",
         rag_service_url: Optional[str] = None,
-        max_retries: int = 2
+        max_retries: int = 4
     ):
         """
         Initialize the generator
