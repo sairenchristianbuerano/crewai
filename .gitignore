@@ -233,8 +233,7 @@ component-generator/generated/
 component-generator/test-outputs/
 !component-generator/test-outputs/README.md
 # Generated tools saved to local filesystem for testing
-component-generator/generated_tools/*.py
-component-generator/generated_tools/*.json
+component-generator/generated_tools/
 !component-generator/generated_tools/README.md
 *.generated.py
 
@@ -395,6 +394,14 @@ tools_export_*.json
 # Project Specific
 # ============================================
 # Add your custom patterns below:
+
+# Test and sample generation scripts
+component-generator/test_generate_endpoint.py
+component-generator/generate_sample.py
+component-generator/generate_sample_simple.py
+
+# Implementation logs
+IMPLEMENTATION_LOG.md
 
 crewai-tool-web-scraper/
 crewai-tool-*/

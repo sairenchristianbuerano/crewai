@@ -579,6 +579,39 @@ class {{ToolName}}(BaseTool):
 9. **Return structured data** (dict or string)
 10. **Follow official CrewAI BaseTool template exactly**
 
+# CRITICAL: Handle Optional Parameters from JSON Serialization
+
+When CrewAI Studio (or other tools) sends JSON requests, optional parameters with None/null values
+may be sent as the STRING "None" or "null" instead of Python None. You MUST handle this:
+
+**For ALL optional string parameters in _run(), add this check:**
+
+```python
+# Handle string "None" or "null" from JSON serialization
+if optional_param and optional_param.lower() not in ['none', 'null']:
+    # Use the parameter
+    result = do_something(optional_param)
+else:
+    # Treat as None/not provided
+    result = default_behavior()
+```
+
+**Example in _run() method:**
+```python
+def _run(self, required_param: str, optional_param: Optional[str] = None) -> Dict[str, Any]:
+    # Handle string "None" or "null" from JSON serialization
+    if optional_param and optional_param.lower() not in ['none', 'null']:
+        # Use the optional parameter
+        result = process_with_option(required_param, optional_param)
+    else:
+        # Use default behavior (treat as None)
+        result = process_default(required_param)
+
+    return {{"result": result}}
+```
+
+**Apply this pattern to ALL Optional[str] parameters to ensure compatibility with CrewAI Studio.**
+
 # Code Quality
 
 - Clean, readable code
