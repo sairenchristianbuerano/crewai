@@ -612,6 +612,171 @@ def _run(self, required_param: str, optional_param: Optional[str] = None) -> Dic
 
 **Apply this pattern to ALL Optional[str] parameters to ensure compatibility with CrewAI Studio.**
 
+# CRITICAL: Pydantic BaseModel Attribute Handling
+
+**BaseTool inherits from Pydantic's BaseModel**, which has strict attribute validation. You CANNOT set arbitrary attributes in __init__:
+
+❌ **WRONG - This will fail:**
+```python
+class MyTool(BaseTool):
+    name: str = "My Tool"
+    description: str = "..."
+    args_schema: Type[BaseModel] = MyToolInput
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.helper = HelperClass()  # ❌ ERROR: Pydantic won't allow this!
+```
+
+✅ **CORRECT Solutions:**
+
+**Option 1: Create helper directly in _run() method (RECOMMENDED - ALWAYS USE THIS)**
+```python
+class MyTool(BaseTool):
+    name: str = "My Tool"
+    description: str = "..."
+    args_schema: Type[BaseModel] = MyToolInput
+
+    # No __init__ needed - keep it simple!
+
+    def _run(self, input: str) -> Dict[str, Any]:
+        # Create helper when needed
+        helper = HelperClass()
+        result = helper.process(input)
+        return {{"result": result}}
+```
+
+**Option 2: Define as proper Pydantic field (ONLY for configuration parameters)**
+```python
+class MyTool(BaseTool):
+    name: str = "My Tool"
+    description: str = "..."
+    args_schema: Type[BaseModel] = MyToolInput
+    api_key: Optional[str] = None  # Pydantic field for config
+
+    def __init__(self, api_key: Optional[str] = None, **kwargs):
+        super().__init__(api_key=api_key, **kwargs)
+
+    def _run(self, input: str) -> Dict[str, Any]:
+        # Use self.api_key directly
+        return {{"result": "..."}}
+```
+
+**When to use each:**
+- **Option 1 (DEFAULT)**: For ALL helper classes, evaluators, parsers, validators, etc. This avoids Pydantic conflicts.
+- **Option 2**: ONLY for user configuration parameters (API keys, URLs, etc.) that are passed to __init__
+
+**CRITICAL: DO NOT use class-level attributes with type annotations - Pydantic will interfere!**
+
+# SECURITY & SAFETY REQUIREMENTS - CRITICAL
+
+**YOU MUST FOLLOW THESE SECURITY RULES:**
+
+## Dangerous Functions - NEVER USE THESE:
+
+❌ **FORBIDDEN:** eval(), exec(), compile(), __import__()
+- These functions are flagged as dangerous by the validator
+- Your code WILL BE REJECTED if you use them
+- No exceptions - even with "safe" namespaces
+
+## Safe Alternatives:
+
+✅ **For mathematical expressions:** Use AST-based evaluation
+
+**CRITICAL: When using AST-based evaluation, you MUST include these imports at the TOP of your file:**
+```python
+from typing import Optional, Type, Dict, Any, Union
+from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
+import ast        # REQUIRED for safe evaluation - DO NOT FORGET THIS
+import operator   # REQUIRED for operators
+import math       # REQUIRED for math functions
+```
+
+**Correct Pattern (USE THIS):**
+```python
+import ast
+import operator
+import math
+
+class SafeMathEvaluator:
+    def __init__(self):
+        # Safe operators
+        self.operators = {{
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.Pow: operator.pow,
+            ast.Mod: operator.mod,
+            ast.USub: operator.neg,
+        }}
+
+        # Safe functions
+        self.functions = {{
+            'sin': math.sin,
+            'cos': math.cos,
+            'tan': math.tan,
+            'sqrt': math.sqrt,
+            'abs': abs,
+            'log': math.log,
+            'exp': math.exp,
+        }}
+
+    def eval_node(self, node):
+        \"\"\"Safely evaluate AST node\"\"\"
+        if isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, ast.Num):  # Python < 3.8
+            return node.n
+        elif isinstance(node, ast.BinOp):
+            left = self.eval_node(node.left)
+            right = self.eval_node(node.right)
+            return self.operators[type(node.op)](left, right)
+        elif isinstance(node, ast.UnaryOp):
+            operand = self.eval_node(node.operand)
+            return self.operators[type(node.op)](operand)
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                func_name = node.func.id
+                if func_name in self.functions:
+                    args = [self.eval_node(arg) for arg in node.args]
+                    return self.functions[func_name](*args)
+        raise ValueError(f"Unsupported operation: {{type(node).__name__}}")
+
+    def safe_eval(self, expression: str) -> float:
+        \"\"\"Safely evaluate mathematical expression\"\"\"
+        tree = ast.parse(expression, mode='eval')
+        return self.eval_node(tree.body)
+```
+
+**Wrong Pattern (NEVER DO THIS):**
+```python
+❌ result = eval(expression)  # REJECTED
+❌ code = compile(expr, "<string>", "eval")  # REJECTED
+❌ result = eval(code, safe_dict)  # STILL REJECTED - no exceptions!
+```
+
+## Why This Matters:
+
+- eval/exec/compile are security vulnerabilities
+- Validator will REJECT your code immediately
+- You'll waste API calls retrying with the same mistake
+- AST-based evaluation is just as powerful and completely safe
+
+## Other Safety Rules:
+
+✅ **DO:**
+- Use ast.parse() for code analysis
+- Use operator module for math operations
+- Whitelist allowed operations explicitly
+- Validate inputs before processing
+
+❌ **DON'T:**
+- Import os.system, subprocess for shell commands (without validation)
+- Use pickle/marshal on untrusted data
+- Access __builtins__ or globals()
+
 # Code Quality
 
 - Clean, readable code
