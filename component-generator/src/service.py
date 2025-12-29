@@ -266,6 +266,150 @@ async def assess_feasibility_endpoint(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/crewai/component-generator/analytics/errors")
+async def get_error_analytics():
+    """
+    Get error analytics and statistics (Phase 2 - backward compatible)
+
+    Returns:
+    {
+        "total_tracked_errors": 150,
+        "unique_error_patterns": 12,
+        "errors_by_type": {
+            "dangerous_function_eval": 45,
+            "pydantic_attribute": 30,
+            ...
+        },
+        "top_errors": [
+            {
+                "type": "dangerous_function_eval",
+                "message": "Dangerous function call detected: eval",
+                "solution": "Use AST-based evaluation...",
+                "frequency": 45
+            },
+            ...
+        ],
+        "last_updated": "2025-12-29T10:30:00"
+    }
+    """
+    if not generator:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    try:
+        # Use Phase 3 learning database if available, fall back to error tracker
+        if hasattr(generator, 'learning_db'):
+            analytics = generator.learning_db.get_error_analytics()
+        else:
+            analytics = generator.error_tracker.get_analytics()
+
+        logger.info("Error analytics retrieved", total_errors=analytics.get("total_tracked_errors", 0))
+        return analytics
+    except Exception as e:
+        logger.error("Failed to retrieve error analytics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/crewai/component-generator/analytics/metrics")
+async def get_overall_metrics():
+    """
+    Get overall generation metrics (Phase 3)
+
+    Returns:
+    {
+        "total_generations": 150,
+        "success_rate": 0.95,
+        "avg_attempts": 1.2,
+        "avg_generation_time_seconds": 45.3,
+        "total_cost_usd": 2.45,
+        "first_attempt_success_rate": 0.83,
+        "first_attempt_successes": 125
+    }
+    """
+    if not generator:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    try:
+        metrics = generator.learning_db.get_overall_metrics()
+        logger.info("Overall metrics retrieved", total_generations=metrics.get("total_generations", 0))
+        return metrics
+    except Exception as e:
+        logger.error("Failed to retrieve overall metrics", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/crewai/component-generator/analytics/insights")
+async def get_category_insights():
+    """
+    Get tool-specific insights and patterns (Phase 3)
+
+    Returns:
+    {
+        "by_category": {
+            "web": {"total_generations": 50, "success_rate": 0.98, "avg_attempts": 1.1},
+            "data": {"total_generations": 30, "success_rate": 0.92, "avg_attempts": 1.5}
+        },
+        "hardest_tools": [
+            {"category": "complex", "avg_attempts": 2.3}
+        ],
+        "easiest_tools": [
+            {"category": "simple", "avg_attempts": 1.0}
+        ]
+    }
+    """
+    if not generator:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    try:
+        insights = generator.learning_db.get_category_insights()
+        logger.info("Category insights retrieved")
+        return insights
+    except Exception as e:
+        logger.error("Failed to retrieve category insights", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/crewai/component-generator/analytics/trends")
+async def get_performance_trends(days: int = 7):
+    """
+    Get performance trends over time (Phase 3)
+
+    Query Parameters:
+    - days: Number of days to analyze (default: 7)
+
+    Returns:
+    {
+        "daily_stats": [
+            {
+                "date": "2025-12-29",
+                "generations": 15,
+                "success_rate": 0.93,
+                "avg_attempts": 1.2,
+                "cost_usd": 0.15
+            },
+            ...
+        ],
+        "improvement": "+2.2% success rate vs previous 7 days",
+        "current_period_success_rate": 0.93,
+        "previous_period_success_rate": 0.91
+    }
+    """
+    if not generator:
+        raise HTTPException(status_code=503, detail="Generator not initialized")
+
+    try:
+        if days < 1 or days > 90:
+            raise HTTPException(status_code=400, detail="Days parameter must be between 1 and 90")
+
+        trends = generator.learning_db.get_trends(days=days)
+        logger.info("Performance trends retrieved", days=days)
+        return trends
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to retrieve performance trends", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
 

@@ -6,6 +6,7 @@ import os
 import json
 import yaml
 import re
+import time
 from typing import Optional, Dict, Any
 import structlog
 from anthropic import Anthropic
@@ -20,6 +21,9 @@ from crewai_validator import CrewAIToolValidator
 from dependency_validator import DependencyValidator, get_validation_summary
 from pattern_matcher import PatternMatcher, get_pattern_report
 from test_generator import TestFileGenerator
+from error_tracker import ErrorTracker
+from learning_database import LearningDatabase
+from success_tracker import SuccessTracker
 
 logger = structlog.get_logger()
 
@@ -56,6 +60,9 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         self.dependency_validator = DependencyValidator()
         self.pattern_matcher = PatternMatcher()
         self.test_generator = TestFileGenerator()
+        self.error_tracker = ErrorTracker()
+        self.learning_db = LearningDatabase()
+        self.success_tracker = SuccessTracker(self.learning_db)
         self.logger = logger.bind(component="crewai_generator")
 
         # Load manual implementation templates
@@ -165,6 +172,11 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         """
         self.logger.info("Starting tool generation", tool_name=spec.name)
 
+        # Track start time for metrics
+        start_time = time.time()
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+
         # 1. Validate dependencies
         self.logger.info("=" * 80)
         self.logger.info("Validating dependencies...")
@@ -223,12 +235,16 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             self.logger.info(f"Generation attempt {attempt}/{self.max_retries + 1}")
 
             # Generate code
-            generated_code = await self._generate_code_with_claude(
+            generated_code, prompt_tokens, completion_tokens = await self._generate_code_with_claude(
                 spec,
                 rag_context,
                 dependency_validation=dependency_validation,
                 previous_errors=validation_result.errors if validation_result else None
             )
+
+            # Accumulate token usage
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
 
             # Validate generated code
             validation_result = await self.validate_tool(generated_code)
@@ -252,6 +268,14 @@ class CrewAIToolGenerator(BaseCodeGenerator):
                 f"Validation failed (attempt {attempt})",
                 errors=validation_result.errors
             )
+
+            # Track errors for learning
+            if validation_result.errors:
+                self.error_tracker.track_error(
+                    errors=validation_result.errors,
+                    tool_name=spec.name,
+                    attempt=attempt
+                )
 
             if attempt > self.max_retries:
                 self.logger.error("Max retries exceeded", tool_name=spec.name)
@@ -306,6 +330,54 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         # 7. Generate and save test file for the tool
         self._generate_test_file(spec, generated_code)
 
+        # 8. Record generation metrics in learning database
+        total_time = time.time() - start_time
+        success = validation_result.is_valid if validation_result else False
+        first_attempt_success = (attempt == 1 and success)
+
+        # Collect error messages if any
+        error_messages = []
+        if validation_result and validation_result.errors:
+            error_messages = validation_result.errors
+
+        try:
+            self.learning_db.record_generation(
+                tool_name=spec.name,
+                tool_category=spec.category,
+                tool_description=spec.description,
+                attempts_needed=attempt,
+                success=success,
+                total_time_seconds=total_time,
+                prompt_tokens=total_prompt_tokens,
+                completion_tokens=total_completion_tokens,
+                validation_passed=validation_result.is_valid if validation_result else False,
+                first_attempt_success=first_attempt_success,
+                error_messages=error_messages if error_messages else None,
+                spec_complexity="medium"  # Can be enhanced with complexity analysis
+            )
+
+            # Track success pattern if first attempt succeeded
+            if first_attempt_success:
+                self.success_tracker.track_success(
+                    tool_name=spec.name,
+                    tool_category=spec.category,
+                    pattern_type="first_attempt",
+                    description=f"Successfully generated {spec.name} on first attempt",
+                    generation_time=total_time
+                )
+
+            self.logger.info(
+                "Generation metrics recorded",
+                tool_name=spec.name,
+                attempts=attempt,
+                time_seconds=round(total_time, 2),
+                total_tokens=total_prompt_tokens + total_completion_tokens
+            )
+
+        except Exception as e:
+            self.logger.error("Failed to record generation metrics", error=str(e))
+            # Don't fail the generation if metric recording fails
+
         return generated_tool
 
     async def _retrieve_similar_components(self, spec: ToolSpec) -> Dict[str, Any]:
@@ -347,8 +419,12 @@ class CrewAIToolGenerator(BaseCodeGenerator):
         rag_context: Dict[str, Any],
         dependency_validation,
         previous_errors: Optional[list] = None
-    ) -> str:
-        """Generate tool code using Claude AI"""
+    ) -> tuple[str, int, int]:
+        """Generate tool code using Claude AI
+
+        Returns:
+            Tuple of (code, prompt_tokens, completion_tokens)
+        """
 
         # Build the prompt
         prompt = self._build_generation_prompt(
@@ -379,7 +455,11 @@ class CrewAIToolGenerator(BaseCodeGenerator):
             # Extract Python code from markdown code blocks if present
             code = self._extract_code_from_response(response_text)
 
-            return code
+            # Extract token usage
+            prompt_tokens = message.usage.input_tokens
+            completion_tokens = message.usage.output_tokens
+
+            return code, prompt_tokens, completion_tokens
 
         except Exception as e:
             self.logger.error("Claude API call failed", error=str(e))
@@ -785,8 +865,119 @@ class SafeMathEvaluator:
 - Comprehensive docstrings
 - Follow PEP 8 style guide
 
-Generate **ONLY the Python code**, no explanations. Start directly with imports.
+# 🎯 CRITICAL: Tool Return Value Format
+
+**CrewAI tools MUST return SIMPLE, DIRECT STRING values that agents can easily consume.**
+
+## ✅ CORRECT Return Patterns:
+
+**Return the actual result as a STRING for best agent compatibility:**
+```python
+def _run(self, input_expression: str) -> str:
+    try:
+        result = evaluate(input_expression)
+        return str(result)  # Convert to string for agent clarity
+    except ValueError as e:
+        return f"Error: {{str(e)}}"  # Simple error string
+```
+
+**Examples of correct returns:**
+```python
+return str(42)              # ✅ "42" - Number as string
+return str(3.14159)         # ✅ "3.14159" - Float as string
+return "Success"            # ✅ Simple string
+return "Error: Division by zero"  # ✅ Error as string
+```
+
+**Why String Returns are Critical:**
+- CrewAI agents parse ALL tool outputs as text
+- Returning raw numbers (int/float) can confuse agent reasoning
+- Strings are always clear and parseable by agents
+- Agent final answers work better with string outputs
+
+## ❌ INCORRECT Return Patterns (DO NOT USE):
+
+**DON'T wrap single values in dictionaries:**
+```python
+# ❌ WRONG - Too verbose for agents
+return {{"result": 42, "status": "success"}}
+
+# ❌ WRONG - Metadata not needed
+return {{"expression": "1+2", "result": 3, "type": "int"}}
+
+# ❌ WRONG - Complex nested structures
+return {{"data": {{"value": 42, "metadata": {{...}}}}}}
+```
+
+## Why Simple Returns Matter:
+
+- **CrewAI agents parse tool outputs as text**
+- Complex dictionaries require agents to extract nested values
+- Simple returns = agents get the answer directly
+- Better agent reasoning and fewer parsing errors
+- Agents can use results immediately without post-processing
+
+## When Dictionaries ARE Appropriate:
+
+**ONLY use dictionaries if the tool genuinely returns multiple related values:**
+```python
+# ✅ CORRECT - Multiple related values (location coordinates)
+return {{"latitude": 40.7, "longitude": -74.0}}
+
+# ✅ CORRECT - Multiple data points that belong together
+return {{"name": "John", "age": 30, "city": "NYC"}}
+```
+
+**But NOT for wrapping single values with metadata:**
+```python
+# ❌ WRONG - Single value doesn't need wrapping
+return {{"result": 42, "unit": "meters"}}  # Just return 42 or "42 meters"
+```
+
+## Implementation Pattern:
+
+```python
+def _run(self, param: str) -> str:
+    \"\"\"Return value as string for best agent compatibility\"\"\"
+    try:
+        # Do your computation
+        result = compute(param)
+
+        # Convert result to string for agent clarity
+        return str(result)
+
+    except ValueError as e:
+        # Return simple error string
+        return f"Error: {{str(e)}}"
+```
+
+**Remember: Always return strings! Agents consume your output as text.**
+
+## Special Case: For numeric tools (calculators, counters, etc.):
+
+```python
+def _run(self, expression: str) -> str:
+    try:
+        result = evaluate(expression)
+        # Convert numeric result to string
+        return str(result)  # e.g., "42" or "3.14159"
+    except ValueError as e:
+        return f"Error: {{str(e)}}"
+```
 """
+
+        # Add dynamic error patterns from tracking system
+        common_errors = self.error_tracker.get_top_errors(limit=10)
+        if common_errors:
+            prompt += "\n\n# ⚠️ CRITICAL: AVOID THESE COMMON MISTAKES (From Recent Errors)\n\n"
+            prompt += "**These errors have been detected frequently in recent generations. DO NOT REPEAT THEM:**\n\n"
+            for idx, error in enumerate(common_errors, 1):
+                prompt += f"{idx}. ❌ **{error['type'].replace('_', ' ').title()}**\n"
+                prompt += f"   - Error: `{error['message']}`\n"
+                prompt += f"   - ✅ Solution: {error['solution']}\n"
+                prompt += f"   - Seen {error['frequency']} times\n\n"
+
+        prompt += "\nGenerate **ONLY the Python code**, no explanations. Start directly with imports.\n"
 
         return prompt
 
