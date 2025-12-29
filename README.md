@@ -2,7 +2,17 @@
 
 Backend services for generating and managing custom CrewAI components.
 
-**CrewAI Version:** Component generator targets [CrewAI v0.86.0](https://github.com/joaomdmoura/crewAI) tool architecture
+## Version Compatibility
+
+**CrewAI:** Component generator targets **CrewAI 1.5.0+** (minimum 0.80.0)
+- Generated tools work with CrewAI 1.5.0 features and APIs
+- Backwards compatible with CrewAI 0.80.0+
+
+**CrewAI Studio:** Compatible with latest [CrewAI Studio](https://github.com/strnad/CrewAI-Studio)
+- Includes fixes for `tasks_output` attribute error in `pg_crew_run.py`
+- Generated tools handle JSON serialization properly (`"None"` and `"null"` strings)
+
+**Python:** 3.10+ (3.11 or 3.12 recommended)
 
 📖 **[API Documentation](API.md)** - Complete endpoint reference
 

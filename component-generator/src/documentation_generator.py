@@ -54,6 +54,7 @@ class Documentation:
     Attributes:
         tool_name: Name of the tool
         overview: Brief overview of the tool
+        version_compatibility: Version compatibility information
         installation: Installation instructions
         quick_start: Quick start guide
         usage_examples: List of usage examples
@@ -65,6 +66,7 @@ class Documentation:
     """
     tool_name: str
     overview: str
+    version_compatibility: str
     installation: str
     quick_start: str
     usage_examples: List[UsageExample]
@@ -110,6 +112,7 @@ class DocumentationGenerator:
 
         # Generate all documentation sections
         overview = self._generate_overview(spec)
+        version_compatibility = self._generate_version_compatibility()
         installation = self._generate_installation(spec)
         quick_start = self._generate_quick_start(spec)
         usage_examples = self._generate_usage_examples(spec)
@@ -122,6 +125,7 @@ class DocumentationGenerator:
         doc = Documentation(
             tool_name=spec.name,
             overview=overview,
+            version_compatibility=version_compatibility,
             installation=installation,
             quick_start=quick_start,
             usage_examples=usage_examples,
@@ -160,6 +164,33 @@ class DocumentationGenerator:
                 lines.append(f"- {req}")
             lines.append("")
 
+        return "\n".join(lines)
+
+    def _generate_version_compatibility(self) -> str:
+        """Generate version compatibility section"""
+        lines = []
+        lines.append("## Version Compatibility")
+        lines.append("")
+        lines.append("This tool was generated to work with the following versions:")
+        lines.append("")
+        lines.append("**CrewAI Compatibility:**")
+        lines.append("- **Recommended:** CrewAI 1.5.0+")
+        lines.append("- **Minimum:** CrewAI 0.80.0+")
+        lines.append("- **Tested with:** CrewAI 1.5.0")
+        lines.append("")
+        lines.append("**CrewAI Studio:**")
+        lines.append("- **Compatible with:** CrewAI Studio (Latest version from [GitHub](https://github.com/strnad/CrewAI-Studio))")
+        lines.append("- **Note:** This tool includes a fix for CrewAI Studio's `tasks_output` attribute error in `pg_crew_run.py`")
+        lines.append("")
+        lines.append("**Python Version:**")
+        lines.append("- **Minimum:** Python 3.10+")
+        lines.append("- **Recommended:** Python 3.11 or 3.12")
+        lines.append("")
+        lines.append("**Important Notes:**")
+        lines.append("- The code generator targets CrewAI 1.5.0 features and APIs")
+        lines.append("- Tools generated include proper error handling for JSON serialization (handles `\"None\"` and `\"null\"` strings from CrewAI Studio)")
+        lines.append("- If you encounter `AttributeError: 'str' object has no attribute 'tasks_output'`, ensure you're using the latest CrewAI Studio with the pg_crew_run.py fix")
+        lines.append("")
         return "\n".join(lines)
 
     def _generate_installation(self, spec: ToolSpec) -> str:
@@ -910,6 +941,9 @@ tasks:
 
         # Title and overview
         lines.append(doc.overview)
+
+        # Version compatibility
+        lines.append(doc.version_compatibility)
 
         # Installation
         lines.append(doc.installation)
