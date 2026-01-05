@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting CrewAI Component Generator service")
 
     # Initialize generator
-    rag_service_url = os.getenv("RAG_SERVICE_URL", "http://localhost:8086")
+    rag_service_url = os.getenv("RAG_SERVICE_URL", "http://localhost:8096")
 
     generator = CrewAIToolGenerator(rag_service_url=rag_service_url)
     feasibility_checker = CrewAIFeasibilityChecker()
@@ -59,7 +59,7 @@ app = FastAPI(
 )
 
 # CORS Configuration
-cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8086", "http://localhost:3000"]')
+cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8095", "http://localhost:8096", "http://localhost:3000"]')
 # Parse JSON string to list
 import json
 allowed_origins = json.loads(cors_origins) if isinstance(cors_origins, str) else cors_origins
@@ -413,7 +413,7 @@ async def get_performance_trends(days: int = 7):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", "8085"))
+    port = int(os.getenv("PORT", "8095"))
 
     uvicorn.run(
         "service:app",

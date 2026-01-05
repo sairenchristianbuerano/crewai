@@ -10,13 +10,13 @@ services:
       dockerfile: Dockerfile
     container_name: crewai-component-generator
     ports:
-      - "8085:8085"
+      - "8095:8095"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
-      - PORT=8085
-      - RAG_SERVICE_URL=http://component-index:8086
-      - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
+      - PORT=8095
+      - RAG_SERVICE_URL=http://component-index:8096
+      - CORS_ORIGINS=["http://localhost:8095", "http://localhost:8096", "http://localhost:3000"]
     volumes:
       - generator_data:/app/data
       # Mount generated_tools to local filesystem for testing and reference
@@ -27,7 +27,7 @@ services:
       - component-index
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8085/api/crewai/component-generator/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8095/api/crewai/component-generator/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -40,13 +40,13 @@ services:
       dockerfile: Dockerfile
     container_name: crewai-component-index
     ports:
-      - "8086:8086"
+      - "8096:8096"
     environment:
-      - PORT=8086
+      - PORT=8096
       - STORAGE_PATH=/app/data/components
       - TOOLS_DIR=/app/data/crewai_components
       - CHROMADB_DIR=/app/data/chromadb
-      - CORS_ORIGINS=["http://localhost:8085", "http://localhost:8086", "http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:8095", "http://localhost:8096", "http://localhost:3000"]
     volumes:
       # Mount entire data directory with unified components
       - ./component-index/data:/app/data
@@ -54,7 +54,7 @@ services:
       - crewai_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8086/api/crewai/component-index/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8096/api/crewai/component-index/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

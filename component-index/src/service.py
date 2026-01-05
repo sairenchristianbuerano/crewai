@@ -72,7 +72,7 @@ app = FastAPI(
 )
 
 # CORS Configuration
-cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8085", "http://localhost:3000"]')
+cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:8095", "http://localhost:8096", "http://localhost:3000"]')
 # Parse JSON string to list
 import json
 allowed_origins = json.loads(cors_origins) if isinstance(cors_origins, str) else cors_origins
@@ -445,7 +445,7 @@ async def get_pattern_by_name(pattern_name: str):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", "8086"))
+    port = int(os.getenv("PORT", "8096"))
 
     uvicorn.run(
         "service:app",
